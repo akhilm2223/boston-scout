@@ -1,0 +1,104 @@
+.map-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.map-container {
+  width: 100%;
+  height: 100%;
+}
+
+/* System stress indicator */
+.stress-indicator {
+  position: absolute;
+  top: 20px;
+  right: 80px;
+  width: 200px;
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 12px;
+  z-index: 10;
+}
+
+.stress-bar {
+  height: 4px;
+  border-radius: 2px;
+  margin-bottom: 8px;
+  transition: width 0.5s ease;
+}
+
+.stress-indicator.green .stress-bar { background: #4ade80; }
+.stress-indicator.yellow .stress-bar { background: #facc15; }
+.stress-indicator.orange .stress-bar { background: #fb923c; }
+.stress-indicator.red .stress-bar { background: #ef4444; }
+
+.stress-label {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.stress-indicator.green .stress-label { color: #4ade80; }
+.stress-indicator.yellow .stress-label { color: #facc15; }
+.stress-indicator.orange .stress-label { color: #fb923c; }
+.stress-indicator.red .stress-label { color: #ef4444; }
+
+.stress-count {
+  float: right;
+  font-size: 12px;
+  color: #888;
+}
+
+/* Network button */
+.network-btn {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 24px;
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(0, 255, 255, 0.4);
+  border-radius: 20px;
+  color: #00ffff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.2s;
+  z-index: 10;
+}
+
+.network-btn:hover {
+  background: rgba(0, 255, 255, 0.15);
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+}
+
+/* Mapbox overrides */
+.mapboxgl-ctrl-group {
+  background: rgba(0, 0, 0, 0.85) !important;
+  border: 1px solid rgba(0, 255, 255, 0.3) !important;
+  border-radius: 8px !important;
+}
+
+.mapboxgl-ctrl-group button {
+  background: transparent !important;
+}
+
+.mapboxgl-ctrl-group button:hover {
+  background: rgba(0, 255, 255, 0.2) !important;
+}
+
+.mapboxgl-ctrl-attrib {
+  background: transparent !important;
+  font-size: 9px !important;
+}
+
+.mapboxgl-ctrl-attrib a {
+  color: #444 !important;
+}

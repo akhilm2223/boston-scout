@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- Light rail body -->
+  <rect x="6" y="8" width="36" height="28" rx="8" fill="#00843D" stroke="#fff" stroke-width="2"/>
+  <!-- Windows -->
+  <rect x="10" y="12" width="12" height="10" rx="2" fill="#87CEEB" stroke="#333" stroke-width="1"/>
+  <rect x="26" y="12" width="12" height="10" rx="2" fill="#87CEEB" stroke="#333" stroke-width="1"/>
+  <!-- Headlight -->
+  <circle cx="24" cy="30" r="3" fill="#FFD700"/>
+  <!-- Wheels -->
+  <rect x="10" y="36" width="10" height="6" rx="2" fill="#333" stroke="#fff" stroke-width="1"/>
+  <rect x="28" y="36" width="10" height="6" rx="2" fill="#333" stroke="#fff" stroke-width="1"/>
+</svg>
