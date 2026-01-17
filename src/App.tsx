@@ -2,8 +2,7 @@ import { useState, useCallback } from 'react';
 import Map3D from './components/Map3D';
 import MapErrorBoundary from './components/MapErrorBoundary';
 import ItineraryPanel from './components/ItineraryPanel';
-import EventSearchPanel, { ItineraryEvent } from './components/EventSearchPanel';
-import RestaurantSearchPanel from './components/RestaurantSearchPanel';
+import { ItineraryEvent } from './types';
 import './App.css';
 
 export interface CitySettings {

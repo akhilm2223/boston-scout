@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { BostonEvent, formatEventDate, formatEventTime } from '../services/eventsApi';
+import { formatEventDate, formatEventTime } from '../services/eventsApi';
+import { BostonEvent, ItineraryEvent, SearchResult } from '../types';
 import './EventSearchPanel.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';

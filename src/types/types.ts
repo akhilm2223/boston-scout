@@ -1,7 +1,7 @@
 export interface ItineraryEvent {
 	id: string;
 	name: string;
-	location: [number, number];
+	location: { lat: number; lng: number };
 	time: string;
 	duration: string;
 	vibe: string;

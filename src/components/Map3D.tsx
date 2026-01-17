@@ -10,8 +10,9 @@ import {
 import { fetchRestaurants, restaurantsToGeoJSON } from '../services/restaurantApi';
 import { fetchEvents, eventsToGeoJSON, formatEventDate, formatEventTime } from '../services/eventsApi';
 import { generateRestaurantInsightHTML } from '../services/geminiApi';
-import { MBTA_STATIC_TRACKS } from '../data/mbtaStaticTracks';
+import { MBTA_ARC_TRACKS } from '../data/mbtaArcTracks';
 import './Map3D.css';
+
 
 mapboxgl.accessToken = 'pk.eyJ1IjoiYW00MzY3IiwiYSI6ImNta2djd243azA0YnMzZG82MGgzczRyaWUifQ.BSxUeP5A3krtRHdzw2n3MA';
 
@@ -317,21 +318,31 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
 
       mapInstance.addSource('mbta-tracks', {
         type: 'geojson',
-        data: MBTA_STATIC_TRACKS,
+        data: MBTA_ARC_TRACKS,
         lineMetrics: true,
       });
 
-      console.log('[MBTA] Static tracks loaded:', MBTA_STATIC_TRACKS.features.length, 'routes');
+      console.log('[MBTA] ARC tracks loaded:', MBTA_ARC_TRACKS.features.length, 'arcs');
 
       // GLOW ZONE - Underneath buildings
       // Style: "Sharp Vector" (Reference Image Match)
+      // Map MBTA LINE values to official colors
       mapInstance.addLayer({
         id: 'glow-zone',
         type: 'line',
         source: 'mbta-tracks',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
-          'line-color': ['get', 'color'],
+          'line-color': [
+            'match',
+            ['get', 'LINE'],
+            'RED', '#da291c',
+            'BLUE', '#003da5',
+            'ORANGE', '#ff7a00',
+            'GREEN', '#00a651',
+            'SILVER', '#7c8ca3',
+            '#cccccc' // default gray
+          ],
           // Precise width: 2px -> 5px
           'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2, 14, 3, 16, 5],
           // Zero blur for sharp "vector" look
@@ -1299,8 +1310,8 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
         (map.current.getSource('events') as mapboxgl.GeoJSONSource).setData(eventsGeoJSON);
       }
 
-      // Static tracks are already loaded - just log confirmation
-      console.log('[MBTA] Static tracks active:', MBTA_STATIC_TRACKS.features.length, 'routes');
+      // ARC tracks are already loaded - just log confirmation
+      console.log('[MBTA] ARC tracks active:', MBTA_ARC_TRACKS.features.length, 'arcs');
 
       // Hide animated glow layers only - keep train layers visible
       const hiddenLayers = [
@@ -1362,12 +1373,12 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
         });
       }
 
-      // Get valid route IDs from our static tracks
+      // Get valid arc IDs from our MBTA arc tracks
       const staticRouteIds = new Set(
-        MBTA_STATIC_TRACKS.features.map(f => f.properties?.routeId)
+        MBTA_ARC_TRACKS.features.map(f => f.properties?.ROUTEID || f.properties?.routeId)
       );
 
-      // Valid routes from static tracks
+      // Valid routes from ARC tracks (shapefile data)
       // Passed to vehiclesToGeoJSON for opacity handling (ghost points)
 
       console.log('[MBTA] Vehicles - total:', vehiclesData.length);
