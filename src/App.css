@@ -31,8 +31,66 @@ body {
   height: 100%;
   overflow: hidden;
   border-right: 1px solid rgba(0, 212, 170, 0.2);
+  display: flex;
+  flex-direction: column;
+  background: #050505;
 }
 
+/* Dual Panel Container - Results + Itinerary side by side */
+.dual-panel-container {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.results-column,
+.itinerary-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.results-column {
+  border-right: 1px solid rgba(0, 212, 170, 0.15);
+}
+
+/* Column Headers */
+.column-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  background: linear-gradient(180deg, rgba(0, 212, 170, 0.08) 0%, transparent 100%);
+  border-bottom: 1px solid rgba(0, 212, 170, 0.2);
+  flex-shrink: 0;
+}
+
+.column-header .header-icon {
+  font-size: 18px;
+}
+
+.column-header h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #00d4aa;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.event-count {
+  background: #00d4aa;
+  color: #050505;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 10px;
+  margin-left: auto;
+}
+
+/* Right Panel - Map */
 .app-right-panel {
   position: relative;
   height: 100%;
@@ -52,16 +110,25 @@ body {
   border-radius: 2px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1200px) {
   .app {
     grid-template-columns: 1fr;
-    grid-template-rows: 250px 1fr;
-    /* Itinerary on top (collapsed height), Map fills rest */
+    grid-template-rows: 1fr 1fr;
   }
 
   .app-left-panel {
     border-right: none;
     border-bottom: 1px solid rgba(0, 212, 170, 0.2);
-    overflow-y: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .dual-panel-container {
+    flex-direction: column;
+  }
+
+  .results-column {
+    border-right: none;
+    border-bottom: 1px solid rgba(0, 212, 170, 0.15);
   }
 }
