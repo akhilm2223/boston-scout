@@ -11,11 +11,13 @@
   },
   "dependencies": {
     "@types/mapbox-gl": "^3.4.1",
+    "@types/three": "^0.182.0",
     "dotenv": "^17.2.3",
     "mapbox-gl": "^3.18.0",
     "mongodb": "^7.0.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "three": "^0.182.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

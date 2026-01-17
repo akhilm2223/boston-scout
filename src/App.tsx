@@ -1,9 +1,6 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import Map3D from './components/Map3D';
-import ControlPanel from './components/ControlPanel';
-import HUD from './components/HUD';
-import WeatherOverlay from './components/WeatherOverlay';
-import LocalWisdom from './components/LocalWisdom';
+import ItineraryPanel from './components/ItineraryPanel';
 import './App.css';
 
 export interface CitySettings {
@@ -20,8 +17,8 @@ export interface CitySettings {
 }
 
 function App() {
-  const [settings, setSettings] = useState<CitySettings>({
-    timeOfDay: 20, // Night for best effects
+  const [settings] = useState<CitySettings>({
+    timeOfDay: 20,
     weather: 'clear',
     fogDensity: 0.5,
     buildingGlow: 0.8,
@@ -33,22 +30,26 @@ function App() {
     neonMode: true,
   });
 
-  const [stats, setStats] = useState({
-    fps: 60,
-    buildings: 0,
-    lights: 0,
-    vehicles: 0,
-    mbtaVehicles: 0,
-  });
+  const [selectedLocation, setSelectedLocation] = useState<{
+    location: [number, number];
+    name: string;
+  } | null>(null);
+
+  const handleLocationClick = useCallback((location: [number, number], name: string) => {
+    setSelectedLocation({ location, name });
+  }, []);
 
   return (
     <div className="app">
-      <Map3D settings={settings} onStatsUpdate={setStats} />
-      <WeatherOverlay weather={settings.weather} />
-      <HUD stats={stats} />
-      <ControlPanel settings={settings} onSettingsChange={setSettings} />
-      <LocalWisdom />
-      {settings.glitchEffect && <div className="glitch-overlay" />}
+      <div className="app-left-panel">
+        <ItineraryPanel onLocationClick={handleLocationClick} />
+      </div>
+      <div className="app-right-panel">
+        <Map3D 
+          settings={settings}
+          selectedLocation={selectedLocation}
+        />
+      </div>
     </div>
   );
 }
