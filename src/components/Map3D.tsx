@@ -13,6 +13,7 @@ import { generateRestaurantInsightHTML } from '../services/geminiApi';
 import { MBTA_STATIC_TRACKS } from '../data/mbtaStaticTracks';
 import './Map3D.css';
 
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 mapboxgl.accessToken = 'pk.eyJ1IjoiYW00MzY3IiwiYSI6ImNta2djd243azA0YnMzZG82MGgzczRyaWUifQ.BSxUeP5A3krtRHdzw2n3MA';
 
 interface Map3DProps {
@@ -789,14 +790,24 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
         if (!e.features || e.features.length === 0) return;
 
         const props = e.features[0].properties;
+        if (!props) return;
         const coordinates = (e.features[0].geometry as any).coordinates.slice();
 
         const startDate = formatEventDate(props.startTime);
         const startTime = formatEventTime(props.startTime);
         const endTime = formatEventTime(props.endTime);
 
+        const photoUrl = props.photoName ?
+          `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${props.photoName}&key=${GOOGLE_MAPS_API_KEY}` : '';
+
         const popupHTML = `
           <div class="event-popup" style="min-width: 280px; max-width: 320px; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;">
+            
+            ${photoUrl ? `<div class="popup-photo" style="width: 100%; height: 140px; background: linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%); border-radius: 8px 8px 0 0; margin: -5px -16px 12px -16px; position: relative; overflow: hidden;">
+              <img src="${photoUrl}" style="width: 100%; height: 100%; object-fit: cover;" 
+                onerror="this.parentElement.style.height='0'; this.parentElement.style.margin='0';" />
+            </div>` : ''}
+
             <div style="padding: 4px 0;">
               <div style="display: inline-block; padding: 5px 12px; background: #000; color: #fff; border-radius: 5px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px;">
                 Event
@@ -861,6 +872,7 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
         if (!e.features || e.features.length === 0) return;
 
         const props = e.features[0].properties;
+        if (!props) return;
         const coordinates = (e.features[0].geometry as any).coordinates.slice();
 
         // Build rating stars (black and white)
@@ -891,9 +903,19 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
         if (props.groups) badges.push('<span class="badge">Groups</span>');
 
         // Photo URL (black and white gradient fallback)
+        const photoUrl = props.photoName ?
+          `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${props.photoName}&key=${GOOGLE_MAPS_API_KEY}` : '';
+
+        console.log('Generating Photo URL:', {
+          name: props.name,
+          photoName: props.photoName,
+          hasKey: !!GOOGLE_MAPS_API_KEY,
+          url: photoUrl
+        });
+
         const photoHTML = props.photoName ?
           `<div class="popup-photo" style="width: 100%; height: 140px; background: linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%); border-radius: 8px 8px 0 0; margin: -12px -16px 12px -16px; position: relative; overflow: hidden;">
-            <img src="https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${props.photoName}&key=YOUR_GOOGLE_API_KEY" 
+            <img src="${photoUrl}" 
                  style="width: 100%; height: 100%; object-fit: cover; filter: grayscale(100%);" 
                  onerror="this.parentElement.style.background='linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%)'; this.style.display='none';" />
             <div style="position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); padding: 5px 10px; border-radius: 6px; font-size: 12px; color: #000; font-weight: 700; border: 1px solid #e5e7eb;">
@@ -1040,8 +1062,7 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
 
         // Ghost Point Guard: Don't interact with invisible trains
         const props = e.features[0].properties;
-        if (props?.opacity === 0) return;
-
+        if (!props) return;
         const coordinates = (e.features[0].geometry as any).coordinates.slice();
 
         // Get vehicle type icon
@@ -1146,6 +1167,7 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
         if (!e.features || e.features.length === 0) return;
 
         const props = e.features[0].properties;
+        if (!props) return;
         const coordinates = (e.features[0].geometry as any).coordinates.slice();
 
         const popupHTML = `

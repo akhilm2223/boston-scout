@@ -21,32 +21,45 @@ interface ItineraryPanelProps {
 
 export default function ItineraryPanel({ onLocationClick, customEvents = [], onRemoveEvent }: ItineraryPanelProps) {
   const [selectedStop, setSelectedStop] = useState<string | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [items, setItems] = useState<ItineraryStop[]>(customEvents);
+
+  // Sync items with customEvents prop
+  if (JSON.stringify(items.map(i => i.id)) !== JSON.stringify(customEvents.map(e => e.id))) {
+    setItems(customEvents.map(e => ({ ...e, isCustom: true })));
+  }
 
   const handleStopClick = (stop: ItineraryStop) => {
     setSelectedStop(stop.id);
     onLocationClick(stop.location, stop.name);
   };
 
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'transit': return '🚆';
-      case 'food': return '🍝';
-      case 'attraction': return '🏛️';
-      case 'university': return '🎓';
-      case 'event': return '🎫';
-      default: return '📍';
-    }
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
   };
 
-  // Only show custom events (events added from search)
-  const allStops = customEvents.map(e => ({ ...e, isCustom: true }));
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
 
-  if (allStops.length === 0) {
+    const newItems = [...items];
+    const draggedItem = newItems[draggedIndex];
+    newItems.splice(draggedIndex, 1);
+    newItems.splice(index, 0, draggedItem);
+    setItems(newItems);
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
+
+  if (items.length === 0) {
     return (
-      <div className="itinerary-panel">
-        <div className="empty-itinerary">
+      <div className="itinerary-panel-v2">
+        <div className="empty-itinerary-v2">
           <span className="empty-icon">📋</span>
-          <p>No events yet</p>
+          <p className="empty-title">No events yet</p>
           <p className="empty-hint">Search and add events →</p>
         </div>
       </div>
@@ -54,52 +67,54 @@ export default function ItineraryPanel({ onLocationClick, customEvents = [], onR
   }
 
   return (
-    <div className="itinerary-panel">
-      <div className="timeline-container">
-        <div className="timeline-line" />
-
-        {allStops.map((stop) => (
+    <div className="itinerary-panel-v2">
+      <div className="itinerary-list">
+        {items.map((stop, index) => (
           <div
             key={stop.id}
-            className={`timeline-stop ${selectedStop === stop.id ? 'selected' : ''} ${stop.sentiment}`}
+            className={`itinerary-item ${selectedStop === stop.id ? 'selected' : ''} ${draggedIndex === index ? 'dragging' : ''}`}
             onClick={() => handleStopClick(stop)}
+            draggable
+            onDragStart={() => handleDragStart(index)}
+            onDragOver={(e) => handleDragOver(e, index)}
+            onDragEnd={handleDragEnd}
           >
-            <div className="timeline-dot">
-              <span className="timeline-icon">{getCategoryIcon(stop.category)}</span>
+            {/* Drag Handle */}
+            <div className="drag-handle" title="Drag to reorder">
+              <span className="grip-dot"></span>
+              <span className="grip-dot"></span>
+              <span className="grip-dot"></span>
+              <span className="grip-dot"></span>
+              <span className="grip-dot"></span>
+              <span className="grip-dot"></span>
             </div>
 
-            <div className="timeline-content">
-              <div className="stop-header">
-                <h3 className="stop-name">{stop.name}</h3>
-                {onRemoveEvent && (
-                  <button
-                    className="remove-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRemoveEvent(stop.id);
-                    }}
-                    title="Remove"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-
-              <div className="stop-details">
-                <span className="stop-time">{stop.time}</span>
-                <span className="stop-separator">•</span>
-                <span className="stop-vibe">{stop.vibe}</span>
-              </div>
+            {/* Item Content */}
+            <div className="item-content">
+              <span className="item-name">{stop.name}</span>
+              {stop.time && <span className="item-time">{stop.time}</span>}
             </div>
+
+            {/* Remove Button */}
+            {onRemoveEvent && (
+              <button
+                className="remove-btn-v2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemoveEvent(stop.id);
+                }}
+                title="Remove from itinerary"
+              >
+                ×
+              </button>
+            )}
           </div>
         ))}
       </div>
 
-      {/* Build Train Schedule Button */}
-      <div className="build-schedule-container">
-        <button className="build-schedule-btn" disabled={allStops.length === 0}>
-          🚆 Build Train Schedule
-        </button>
+      {/* Footer */}
+      <div className="itinerary-footer">
+        <div className="item-count">{items.length} {items.length === 1 ? 'experience' : 'experiences'}</div>
       </div>
     </div>
   );

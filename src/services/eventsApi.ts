@@ -12,11 +12,13 @@ export interface BostonEvent {
     name: string;
     lat: number;
     lng: number;
+    address?: string;
   };
   categories?: string[];
   price?: string;
   source?: string;
   source_url?: string;
+  photo_name?: string;
 }
 
 // Fetch all events from MongoDB
@@ -24,7 +26,7 @@ export async function fetchEvents(): Promise<BostonEvent[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/events`);
     if (!response.ok) throw new Error(`API error: ${response.status}`);
-    
+
     const data = await response.json();
     return data;
   } catch (error) {
@@ -55,6 +57,7 @@ export function eventsToGeoJSON(events: BostonEvent[]): GeoJSON.FeatureCollectio
           price: event.price || 'Free',
           source: event.source || '',
           sourceUrl: event.source_url || '',
+          photoName: event.photo_name || '',
         },
       };
     });
@@ -67,11 +70,11 @@ export function formatEventDate(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
   const diffDays = Math.floor((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  
+
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Tomorrow';
   if (diffDays < 7) return date.toLocaleDateString('en-US', { weekday: 'long' });
-  
+
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 

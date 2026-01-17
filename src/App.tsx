@@ -38,8 +38,24 @@ function App() {
     name: string;
   } | null>(null);
 
+  // Search State
   const [itineraryEvents, setItineraryEvents] = useState<ItineraryEvent[]>([]);
-  const [activeTab, setActiveTab] = useState<'events' | 'restaurants'>('events');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeSearchQuery, setActiveSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+
+  const handleSearchSubmit = useCallback(() => {
+    if (searchQuery.trim()) {
+      setActiveSearchQuery(searchQuery);
+      setIsSearching(true);
+      // Reset searching state after a timeout to simulate loading "handoff"
+      setTimeout(() => setIsSearching(false), 1000);
+    }
+  }, [searchQuery]);
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSearchSubmit();
+  };
 
   const handleLocationClick = useCallback((location: [number, number], name: string) => {
     setSelectedLocation({ location, name });
@@ -61,54 +77,46 @@ function App() {
       {/* Left Panel: Results + Itinerary Side by Side */}
       <div className="app-left-panel">
         <div className="dual-panel-container">
-          {/* Results Column */}
-          <div className="results-column">
-            {/* Tab Header */}
-            <div className="tab-header">
-              <button
-                className={`tab-btn ${activeTab === 'events' ? 'active' : ''}`}
-                onClick={() => setActiveTab('events')}
-              >
-                <span className="tab-icon">🎫</span>
-                Events
-              </button>
-              <button
-                className={`tab-btn ${activeTab === 'restaurants' ? 'active' : ''}`}
-                onClick={() => setActiveTab('restaurants')}
-              >
-                <span className="tab-icon">🍽️</span>
-                Restaurants
-              </button>
-            </div>
-
-            {/* Tab Content */}
-            {activeTab === 'events' ? (
-              <EventSearchPanel
-                onAddToItinerary={handleAddToItinerary}
-                onLocationClick={handleLocationClick}
-              />
-            ) : (
-              <RestaurantSearchPanel
-                onAddToItinerary={handleAddToItinerary}
-                onLocationClick={handleLocationClick}
-              />
-            )}
+          {/* Discovery Column (4-Card Grid) */}
+          <div className="discovery-column">
+            <EventSearchPanel
+              onAddToItinerary={handleAddToItinerary}
+              onLocationClick={handleLocationClick}
+              activeSearchQuery={activeSearchQuery}
+            />
           </div>
 
           {/* Itinerary Column */}
           <div className="itinerary-column">
             <div className="column-header">
-              <span className="header-icon">📋</span>
-              <h2>Itinerary</h2>
-              {itineraryEvents.length > 0 && (
-                <span className="event-count">{itineraryEvents.length}</span>
-              )}
+              <h2>Your Itinerary</h2>
             </div>
             <ItineraryPanel
               onLocationClick={handleLocationClick}
               customEvents={itineraryEvents}
               onRemoveEvent={handleRemoveFromItinerary}
             />
+          </div>
+        </div>
+
+        {/* Unified Search Bar */}
+        <div className="global-search-container">
+          <div className="search-wrapper">
+            <input
+              type="text"
+              className="global-search-input"
+              placeholder="Ask for experiences... (e.g. 'romantic dinner' or 'jazz concert')"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyPress={handleKeyPress}
+            />
+            <button
+              className="global-search-btn"
+              onClick={handleSearchSubmit}
+              disabled={isSearching}
+            >
+              {isSearching ? '...' : '→'}
+            </button>
           </div>
         </div>
       </div>

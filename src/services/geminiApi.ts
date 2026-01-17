@@ -1,6 +1,6 @@
 // Gemini API Service for Restaurant Insights
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 interface RestaurantInsight {
   whyVisit: string;
@@ -13,7 +13,7 @@ const insightCache = new Map<string, RestaurantInsight>();
 // Smart fallbacks based on restaurant type
 function getSmartFallback(categories: string, rating: number): RestaurantInsight {
   const lowerCat = categories.toLowerCase();
-  
+
   // Determine best time based on category
   let bestTime = 'Lunch or dinner';
   if (lowerCat.includes('breakfast') || lowerCat.includes('brunch') || lowerCat.includes('cafe') || lowerCat.includes('coffee')) {
@@ -28,7 +28,7 @@ function getSmartFallback(categories: string, rating: number): RestaurantInsight
 
   // Determine why visit based on category and rating
   let whyVisit = 'Popular local spot';
-  
+
   if (rating >= 4.5) {
     if (lowerCat.includes('italian')) whyVisit = 'Authentic Italian cuisine loved by locals';
     else if (lowerCat.includes('seafood')) whyVisit = 'Fresh seafood and harbor views';
@@ -140,7 +140,7 @@ export async function generateRestaurantInsightHTML(
   city: string
 ): Promise<string> {
   const insight = await getRestaurantInsight(name, categories, rating, city);
-  
+
   return `
     <div style="margin: 12px 0; padding: 12px; background: #fafafa; border-radius: 6px; border-left: 3px solid #000;">
       <div style="font-size: 11px; font-weight: 700; color: #000; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">

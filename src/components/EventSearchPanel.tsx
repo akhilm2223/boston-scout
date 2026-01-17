@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { BostonEvent, formatEventDate, formatEventTime } from '../services/eventsApi';
 import './EventSearchPanel.css';
 
@@ -16,9 +16,10 @@ export interface ItineraryEvent {
     eventData?: BostonEvent;
 }
 
-interface EventSearchPanelProps {
+export interface EventSearchPanelProps {
     onAddToItinerary: (event: ItineraryEvent) => void;
     onLocationClick: (location: [number, number], name: string) => void;
+    activeSearchQuery?: string;
 }
 
 interface SearchResult {
@@ -32,39 +33,49 @@ interface SearchResult {
     events: BostonEvent[];
 }
 
-export default function EventSearchPanel({ onAddToItinerary, onLocationClick }: EventSearchPanelProps) {
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedDate, setSelectedDate] = useState('');
+// Placeholder images for events without images
+const PLACEHOLDER_IMAGES = [
+    'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&h=300&fit=crop',
+    'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=400&h=300&fit=crop',
+    'https://images.unsplash.com/photo-1429962714451-bb934ecdc4ec?w=400&h=300&fit=crop',
+    'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=400&h=300&fit=crop',
+    'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=400&h=300&fit=crop',
+    'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=400&h=300&fit=crop',
+];
+
+export default function EventSearchPanel({ onAddToItinerary, onLocationClick, activeSearchQuery }: EventSearchPanelProps) {
     const [isSearching, setIsSearching] = useState(false);
-    const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
+    const [allEvents, setAllEvents] = useState<BostonEvent[]>([]);
+    const [currentPage, setCurrentPage] = useState(0);
+    const [selectedCardIndex, setSelectedCardIndex] = useState(0);
     const [addedEventIds, setAddedEventIds] = useState<Set<string>>(new Set());
     const [error, setError] = useState<string | null>(null);
+    const [showDetails, setShowDetails] = useState<BostonEvent | null>(null);
 
-    const handleSearch = useCallback(async () => {
-        if (!searchQuery.trim()) {
-            setError('Please enter a search query');
-            return;
+    const CARDS_PER_PAGE = 24;
+    const currentEvents = allEvents.slice(currentPage * CARDS_PER_PAGE, (currentPage + 1) * CARDS_PER_PAGE);
+    const totalPages = Math.ceil(allEvents.length / CARDS_PER_PAGE);
+
+    // Initial load
+    useEffect(() => {
+        handleSearch('events in boston');
+    }, []);
+
+    // Handle external search
+    useEffect(() => {
+        if (activeSearchQuery) {
+            handleSearch(activeSearchQuery);
         }
+    }, [activeSearchQuery]);
 
+    const handleSearch = useCallback(async (query: string) => {
         setIsSearching(true);
         setError(null);
 
         try {
-            // Build request body with optional date filter
-            const requestBody: { query: string; startDate?: string; endDate?: string } = {
-                query: searchQuery
+            const requestBody: { query: string } = {
+                query: query
             };
-
-            if (selectedDate) {
-                // Set date range for the selected day (start of day to end of day)
-                const startOfDay = new Date(selectedDate);
-                startOfDay.setHours(0, 0, 0, 0);
-                const endOfDay = new Date(selectedDate);
-                endOfDay.setHours(23, 59, 59, 999);
-
-                requestBody.startDate = startOfDay.toISOString();
-                requestBody.endDate = endOfDay.toISOString();
-            }
 
             const response = await fetch(`${API_BASE_URL}/api/events/search`, {
                 method: 'POST',
@@ -77,22 +88,39 @@ export default function EventSearchPanel({ onAddToItinerary, onLocationClick }: 
             }
 
             const result: SearchResult = await response.json();
-            setSearchResult(result);
+            setAllEvents(result.events);
+            setCurrentPage(0);
+            setSelectedCardIndex(0);
         } catch (err) {
             console.error('Search error:', err);
-            setError('Failed to search events. Please check if the server is running.');
+            setError('Failed to load events');
         } finally {
             setIsSearching(false);
         }
-    }, [searchQuery, selectedDate]);
+    }, []);
 
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            handleSearch();
+    const handleSkip = () => {
+        if (currentPage < totalPages - 1) {
+            setCurrentPage(prev => prev + 1);
+            setSelectedCardIndex(0);
+        } else {
+            // Wrap to beginning
+            setCurrentPage(0);
+            setSelectedCardIndex(0);
         }
     };
 
-    const handleAddToItinerary = (event: BostonEvent) => {
+    const handleShowSimilar = () => {
+        const selectedEvent = currentEvents[selectedCardIndex];
+        if (selectedEvent?.categories?.[0]) {
+            handleSearch(selectedEvent.categories[0]);
+        }
+    };
+
+    const handleAddToItinerary = () => {
+        const event = currentEvents[selectedCardIndex];
+        if (!event || addedEventIds.has(event._id)) return;
+
         const itineraryEvent: ItineraryEvent = {
             id: event._id,
             name: event.title,
@@ -109,7 +137,15 @@ export default function EventSearchPanel({ onAddToItinerary, onLocationClick }: 
         setAddedEventIds(prev => new Set(prev).add(event._id));
     };
 
-    const handleEventClick = (event: BostonEvent) => {
+    const handleSeeDetails = () => {
+        const event = currentEvents[selectedCardIndex];
+        if (event) {
+            setShowDetails(event);
+        }
+    };
+
+    const handleCardClick = (index: number, event: BostonEvent) => {
+        setSelectedCardIndex(index);
         if (event.venue?.lat && event.venue?.lng) {
             onLocationClick([event.venue.lng, event.venue.lat], event.title);
         }
@@ -124,119 +160,106 @@ export default function EventSearchPanel({ onAddToItinerary, onLocationClick }: 
         return `${hours} hours`;
     };
 
-    const getCategoryEmoji = (categories?: string[]): string => {
-        if (!categories || categories.length === 0) return '📅';
-        const cat = categories[0]?.toLowerCase() || '';
-        if (cat.includes('music') || cat.includes('concert')) return '🎵';
-        if (cat.includes('sport')) return '⚽';
-        if (cat.includes('art') || cat.includes('museum')) return '🎨';
-        if (cat.includes('food') || cat.includes('dining')) return '🍴';
-        if (cat.includes('comedy')) return '😂';
-        if (cat.includes('family') || cat.includes('kid')) return '👨‍👩‍👧';
-        if (cat.includes('outdoor') || cat.includes('nature')) return '🌳';
-        if (cat.includes('tech') || cat.includes('conference')) return '💻';
-        if (cat.includes('wellness') || cat.includes('fitness')) return '🧘';
-        return '📅';
+    const getEventImage = (event: BostonEvent, index: number): string => {
+        if (event.image_url) return event.image_url;
+        return PLACEHOLDER_IMAGES[index % PLACEHOLDER_IMAGES.length];
     };
 
-    return (
-        <div className="event-search-panel">
-            {/* Search Results Area */}
-            <div className="search-results-area">
-                {error && (
-                    <div className="search-error">
-                        <span>⚠️</span> {error}
-                    </div>
-                )}
+    const selectedEvent = currentEvents[selectedCardIndex];
+    const isSelectedAdded = selectedEvent && addedEventIds.has(selectedEvent._id);
 
-                {searchResult && searchResult.events.length > 0 && (
-                    <div className="events-list">
-                        {searchResult.events.map(event => (
-                            <div
-                                key={event._id}
-                                className={`event-card ${addedEventIds.has(event._id) ? 'added' : ''}`}
-                                onClick={() => handleEventClick(event)}
-                            >
-                                <div className="event-emoji">{getCategoryEmoji(event.categories)}</div>
-                                <div className="event-info">
-                                    <h3 className="event-title">{event.title}</h3>
-                                    <div className="event-meta">
-                                        <span className="event-date">{formatEventDate(event.start_time)}</span>
-                                        <span className="event-separator">•</span>
-                                        <span className="event-time">{formatEventTime(event.start_time)}</span>
-                                    </div>
-                                    <p className="event-venue">{event.venue?.name}</p>
-                                </div>
+    return (
+        <div className="discovery-panel">
+            {/* 4-Card Grid */}
+            <div className="cards-grid">
+                {currentEvents.length > 0 ? (
+                    currentEvents.map((event, index) => (
+                        <div
+                            key={event._id}
+                            className={`event-card-v2 ${selectedCardIndex === index ? 'selected' : ''} ${addedEventIds.has(event._id) ? 'added' : ''}`}
+                            onClick={() => handleCardClick(index, event)}
+                            style={{
+                                '--event-image': `url(${getEventImage(event, index)})`
+                            } as React.CSSProperties}
+                        >
+                            {/* Simple Action Buttons on Card */}
+                            <div className="card-actions">
                                 <button
-                                    className={`add-button ${addedEventIds.has(event._id) ? 'added' : ''}`}
+                                    className="card-action-btn accept"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        handleAddToItinerary(event);
+                                        if (!addedEventIds.has(event._id)) {
+                                            const itineraryEvent: ItineraryEvent = {
+                                                id: event._id,
+                                                name: event.title,
+                                                location: [event.venue.lng, event.venue.lat],
+                                                time: formatEventTime(event.start_time),
+                                                duration: calculateDuration(event.start_time, event.end_time),
+                                                vibe: event.venue.name,
+                                                sentiment: 'positive',
+                                                category: 'event',
+                                                eventData: event
+                                            };
+                                            onAddToItinerary(itineraryEvent);
+                                            setAddedEventIds(prev => new Set(prev).add(event._id));
+                                        }
                                     }}
                                     disabled={addedEventIds.has(event._id)}
-                                    title={addedEventIds.has(event._id) ? 'Added to itinerary' : 'Add to itinerary'}
+                                    title="Add to itinerary"
                                 >
-                                    {addedEventIds.has(event._id) ? '✓' : '+'}
+                                    {addedEventIds.has(event._id) ? 'Added' : 'Add to Itinerary'}
                                 </button>
                             </div>
-                        ))}
-                    </div>
-                )}
 
-                {searchResult && searchResult.events.length === 0 && (
-                    <div className="no-results">
-                        <span className="no-results-icon">🔍</span>
-                        <p>No events found</p>
-                    </div>
-                )}
-
-                {!searchResult && !error && (
-                    <div className="empty-state">
-                        <span className="empty-icon">✨</span>
-                        <p>Search for events using AI</p>
-                        <p className="empty-hint">Try "live music" or "family activities"</p>
+                            {addedEventIds.has(event._id) && (
+                                <div className="card-added-badge">✓ Added</div>
+                            )}
+                            <div className="card-content">
+                                <h3 className="card-title">{event.title}</h3>
+                                <p className="card-venue">{event.venue?.name}</p>
+                                <p className="card-date">
+                                    {formatEventDate(event.start_time)} • {formatEventTime(event.start_time)}
+                                </p>
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <div className="empty-grid">
+                        {isSearching ? (
+                            <div className="loading-state">
+                                <div className="spinner-large"></div>
+                                <p>Discovering experiences...</p>
+                            </div>
+                        ) : (
+                            <div className="empty-state-v2">
+                                <span className="empty-icon">✨</span>
+                                <p>Search for experiences</p>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
 
-            {/* Search Bar at Bottom */}
-            <div className="search-bar-container">
-                <div className="search-row">
-                    <input
-                        type="text"
-                        className="search-input"
-                        placeholder='Search events... (e.g. "jazz")'
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                    />
-                    <button
-                        className={`search-button ${isSearching ? 'searching' : ''}`}
-                        onClick={handleSearch}
-                        disabled={isSearching}
-                    >
-                        {isSearching ? <span className="spinner"></span> : '🔍'}
-                    </button>
-                </div>
-                <div className="date-row">
-                    <label className="date-label">📅 Date:</label>
-                    <input
-                        type="date"
-                        className="date-input"
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                    />
-                    {selectedDate && (
+            {/* Page Indicator */}
+            {totalPages > 1 && (
+                <div className="page-indicator">
+                    {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => (
                         <button
-                            className="clear-date-btn"
-                            onClick={() => setSelectedDate('')}
-                            title="Clear date"
-                        >
-                            ✕
-                        </button>
-                    )}
+                            key={i}
+                            className={`page-dot ${currentPage === i ? 'active' : ''}`}
+                            onClick={() => { setCurrentPage(i); setSelectedCardIndex(0); }}
+                        />
+                    ))}
+                    {totalPages > 10 && <span className="more-pages">+{totalPages - 10}</span>}
                 </div>
-            </div>
+            )}
+
+            {/* Error Message */}
+            {error && (
+                <div className="error-toast">
+                    <span>⚠️</span> {error}
+                </div>
+            )}
         </div>
     );
 }
