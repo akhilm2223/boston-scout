@@ -3,8 +3,9 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    background: #000000;
+    background: var(--bg-primary);
     overflow: hidden;
+    transition: background-color 0.3s ease;
 }
 
 /* List Layout - Vertical Scroll */
@@ -24,8 +25,8 @@
     height: 140px;
     min-height: 140px;
     border-radius: 12px;
-    background: #000000;
-    border: 1px solid #222;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-primary);
     cursor: pointer;
     overflow: hidden;
     transition: all 0.2s ease;
@@ -61,19 +62,19 @@
     top: 0;
     bottom: 0;
     width: 40%;
-    background: linear-gradient(to right, rgba(0, 0, 0, 0) 50%, #000 100%);
+    background: linear-gradient(to right, rgba(0, 0, 0, 0) 50%, var(--bg-primary) 100%);
     z-index: 2;
     pointer-events: none;
 }
 
 .event-card-v2:hover {
-    border-color: #666;
+    border-color: var(--text-muted);
     transform: translateX(4px);
 }
 
 .event-card-v2.selected {
-    border-color: #fff;
-    box-shadow: 0 0 0 1px #fff;
+    border-color: var(--text-primary);
+    box-shadow: 0 0 0 1px var(--text-primary);
 }
 
 /* Content on Right side */
@@ -88,28 +89,32 @@
     flex-direction: column;
     justify-content: center;
     flex: 1;
-    background: #000000;
+    background: var(--bg-primary);
+    transition: background-color 0.3s ease;
 }
 
 .card-title {
     font-size: 16px;
     font-weight: 600;
-    color: #ffffff;
+    color: var(--text-primary);
     margin: 0 0 8px 0;
     line-height: 1.3;
+    transition: color 0.3s ease;
 }
 
 .card-venue {
     font-size: 13px;
-    color: #cccccc;
+    color: var(--text-secondary);
     margin: 0 0 4px 0;
+    transition: color 0.3s ease;
 }
 
 .card-date {
     font-size: 12px;
-    color: #999999;
+    color: var(--text-muted);
     margin: 0;
     font-weight: 500;
+    transition: color 0.3s ease;
 }
 
 /* Actions - now part of the content area or absolute on right */
@@ -123,8 +128,8 @@
 }
 
 .card-action-btn.accept {
-    background: #fff;
-    color: #000;
+    background: var(--text-primary);
+    color: var(--bg-primary);
     border: none;
     border-radius: 4px;
     padding: 8px 16px;
@@ -136,16 +141,16 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.2s;
+    transition: background 0.2s, color 0.2s;
 }
 
 .card-action-btn.accept:hover {
-    background: #ccc;
+    background: var(--text-secondary);
 }
 
 .card-action-btn.accept:disabled {
-    background: #333;
-    color: #666;
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
     cursor: not-allowed;
 }
 
@@ -153,15 +158,16 @@
     position: absolute;
     top: 12px;
     right: 12px;
-    background: #333;
-    color: #fff;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
     font-size: 10px;
     padding: 4px 8px;
     border-radius: 4px;
     z-index: 10;
-    border: 1px solid #555;
+    border: 1px solid var(--border-primary);
     display: none;
     /* Hidden because button text changes */
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Empty States */
@@ -178,14 +184,15 @@
     flex-direction: column;
     align-items: center;
     gap: 16px;
-    color: #666;
+    color: var(--text-muted);
+    transition: color 0.3s ease;
 }
 
 .spinner-large {
     width: 30px;
     height: 30px;
-    border: 2px solid #333;
-    border-top-color: #fff;
+    border: 2px solid var(--border-primary);
+    border-top-color: var(--text-primary);
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -201,7 +208,8 @@
     flex-direction: column;
     align-items: center;
     gap: 12px;
-    color: #444;
+    color: var(--text-muted);
+    transition: color 0.3s ease;
 }
 
 .empty-state-v2 .empty-icon {
@@ -215,10 +223,10 @@
 }
 
 .cards-grid::-webkit-scrollbar-track {
-    background: #000;
+    background: var(--bg-primary);
 }
 
 .cards-grid::-webkit-scrollbar-thumb {
-    background: #333;
+    background: var(--border-primary);
     border-radius: 3px;
 }

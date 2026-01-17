@@ -35,17 +35,17 @@ export default function StepTwo({ data, onChange }: StepTwoProps) {
     return (
         <div className="w-full p-6 space-y-6">
             <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-gray-800">How far would you like to walk from T stations?</h2>
-                <p className="text-gray-500 mt-2">Set your preferred maximum walking distance from transit stops</p>
+                <h2 className="text-2xl font-bold text-(--text-primary) transition-colors duration-300">How far would you like to walk from T stations?</h2>
+                <p className="text-(--text-secondary) mt-2 transition-colors duration-300">Set your preferred maximum walking distance from transit stops</p>
             </div>
 
             {/* Walking Time Slider */}
             <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                    <label className="block text-sm font-medium text-gray-700">
+                    <label className="block text-sm font-medium text-(--text-secondary) transition-colors duration-300">
                         Walking Time
                     </label>
-                    <span className="text-2xl font-bold text-blue-600">
+                    <span className="text-2xl font-bold text-(--accent) transition-colors duration-300">
                         {walkingTimeMinutes} min
                     </span>
                 </div>
@@ -56,10 +56,10 @@ export default function StepTwo({ data, onChange }: StepTwoProps) {
                     max="30"
                     value={walkingTimeMinutes}
                     onChange={(e) => setWalkingTimeMinutes(Number(e.target.value))}
-                    className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                    className="w-full h-3 bg-(--bg-tertiary) rounded-lg appearance-none cursor-pointer accent-(--accent)"
                 />
                 
-                <div className="flex justify-between text-xs text-gray-500">
+                <div className="flex justify-between text-xs text-(--text-muted) transition-colors duration-300">
                     <span>1 min</span>
                     <span>15 min</span>
                     <span>30 min</span>
@@ -67,19 +67,19 @@ export default function StepTwo({ data, onChange }: StepTwoProps) {
             </div>
 
             {/* Distance Summary */}
-            <div className="bg-blue-50 rounded-lg p-6 text-center">
-                <p className="text-gray-600 text-sm mb-2">This is approximately</p>
-                <p className="text-3xl font-bold text-blue-800">
+            <div className="bg-(--accent-muted) rounded-lg p-6 text-center transition-colors duration-300">
+                <p className="text-(--text-secondary) text-sm mb-2 transition-colors duration-300">This is approximately</p>
+                <p className="text-3xl font-bold text-(--accent) transition-colors duration-300">
                     {formatDistance(calculateDistance(walkingTimeMinutes))}
                 </p>
-                <p className="text-gray-500 text-sm mt-2">
+                <p className="text-(--text-muted) text-sm mt-2 transition-colors duration-300">
                     Based on average walking speed of {WALKING_SPEED_MPH} mph
                 </p>
             </div>
 
             {/* Quick Select Buttons */}
-            <div className="border-t pt-6">
-                <p className="text-sm font-medium text-gray-700 mb-3">Quick select:</p>
+            <div className="border-t border-(--border-primary) pt-6 transition-colors duration-300">
+                <p className="text-sm font-medium text-(--text-secondary) mb-3 transition-colors duration-300">Quick select:</p>
                 <div className="flex flex-wrap gap-2">
                     {[
                         { label: '5 min (quick)', value: 5 },
@@ -93,8 +93,8 @@ export default function StepTwo({ data, onChange }: StepTwoProps) {
                             onClick={() => setWalkingTimeMinutes(option.value)}
                             className={`px-4 py-2 rounded-full text-sm transition-colors ${
                                 walkingTimeMinutes === option.value
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                                    ? 'bg-(--accent) text-(--text-inverse)'
+                                    : 'bg-(--bg-secondary) hover:bg-(--bg-hover) text-(--text-primary)'
                             }`}
                         >
                             {option.label}
@@ -104,12 +104,12 @@ export default function StepTwo({ data, onChange }: StepTwoProps) {
             </div>
 
             {/* Info Box */}
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <div className="bg-(--bg-secondary) rounded-lg p-4 border border-(--border-primary) transition-colors duration-300">
                 <div className="flex items-start space-x-3">
                     <span className="text-xl">🚶</span>
                     <div>
-                        <p className="text-sm text-gray-700 font-medium">Why does this matter?</p>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="text-sm text-(--text-primary) font-medium transition-colors duration-300">Why does this matter?</p>
+                        <p className="text-sm text-(--text-muted) mt-1 transition-colors duration-300">
                             We'll use this preference to find events, restaurants, and attractions 
                             that are within your comfortable walking distance from MBTA stations.
                         </p>

@@ -97,16 +97,21 @@ export default function ItineraryPanel({
   };
   
   return (
-		<div className="w-full h-full bg-white flex flex-col relative overflow-hidden">
+		<div className="w-full h-full bg-(--bg-primary) flex flex-col relative overflow-hidden transition-colors duration-300">
 			<div className="flex flex-row space-x-5 p-2">
-				<div className="text-2xl font-bold">Your Current Itinerary</div>
+				<div className="text-2xl font-bold text-(--text-primary) transition-colors duration-300">Your Current Itinerary</div>
 				<div>
-					<button onClick={handlePrev} disabled={currentStep === 1}>
+					<button 
+						onClick={handlePrev} 
+						disabled={currentStep === 1}
+						className="px-3 py-1 mr-2 bg-(--bg-secondary) text-(--text-primary) border border-(--border-primary) rounded hover:bg-(--bg-hover) disabled:opacity-50 transition-colors duration-300"
+					>
 						Back
 					</button>
 					<button
 						onClick={handleNext}
 						disabled={currentStep === totalSteps || !validateStep(currentStep, tripDates)}
+						className="px-3 py-1 bg-(--accent) text-(--text-inverse) rounded hover:bg-(--accent-hover) disabled:opacity-50 transition-colors duration-300"
 					>
 						Next
 					</button>

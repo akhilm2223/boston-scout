@@ -60,14 +60,14 @@ export default function StepOne({ data, onChange }: StepOneProps) {
     return (
         <div className="w-full p-6 space-y-6">
             <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-gray-800">When are you visiting Boston?</h2>
-                <p className="text-gray-500 mt-2">Select your travel dates to help us plan your itinerary</p>
+                <h2 className="text-2xl font-bold text-(--text-primary) transition-colors duration-300">When are you visiting Boston?</h2>
+                <p className="text-(--text-secondary) mt-2 transition-colors duration-300">Select your travel dates to help us plan your itinerary</p>
             </div>
 
             {/* Date Selection */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">
+                    <label className="block text-sm font-medium text-(--text-secondary) transition-colors duration-300">
                         Start Date
                     </label>
                     <input
@@ -80,12 +80,12 @@ export default function StepOne({ data, onChange }: StepOneProps) {
                                 setEndDate(e.target.value);
                             }
                         }}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        className="w-full px-4 py-3 border border-(--border-primary) bg-(--bg-input) text-(--text-primary) rounded-lg focus:ring-2 focus:ring-(--accent) focus:border-transparent transition-all"
                     />
                 </div>
 
                 <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">
+                    <label className="block text-sm font-medium text-(--text-secondary) transition-colors duration-300">
                         End Date
                     </label>
                     <input
@@ -93,33 +93,33 @@ export default function StepOne({ data, onChange }: StepOneProps) {
                         value={endDate}
                         min={startDate}
                         onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        className="w-full px-4 py-3 border border-(--border-primary) bg-(--bg-input) text-(--text-primary) rounded-lg focus:ring-2 focus:ring-(--accent) focus:border-transparent transition-all"
                     />
                 </div>
             </div>
 
             {/* Date Summary */}
             {startDate && (
-                <div className="bg-blue-50 rounded-lg p-4 text-center">
-                    <p className="text-blue-800 font-medium">{formatDateDisplay()}</p>
-                    <p className="text-blue-600 text-sm mt-1">
+                <div className="bg-(--accent-muted) rounded-lg p-4 text-center transition-colors duration-300">
+                    <p className="text-(--text-primary) font-medium transition-colors duration-300">{formatDateDisplay()}</p>
+                    <p className="text-(--accent) text-sm mt-1 transition-colors duration-300">
                         {getDayCount()} {getDayCount() === 1 ? 'day' : 'days'} (inclusive)
                     </p>
                 </div>
             )}
 
             {/* Time Specification Toggle */}
-            <div className="border-t pt-6">
+            <div className="border-t border-(--border-primary) pt-6 transition-colors duration-300">
                 <label className="flex items-center space-x-3 cursor-pointer">
                     <input
                         type="checkbox"
                         checked={specifyTimes}
                         onChange={(e) => setSpecifyTimes(e.target.checked)}
-                        className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        className="w-5 h-5 text-(--accent) border-(--border-primary) rounded focus:ring-(--accent)"
                     />
-                    <span className="text-gray-700">Specify arrival and departure times</span>
+                    <span className="text-(--text-primary) transition-colors duration-300">Specify arrival and departure times</span>
                 </label>
-                <p className="text-gray-500 text-sm mt-1 ml-8">
+                <p className="text-(--text-muted) text-sm mt-1 ml-8 transition-colors duration-300">
                     {specifyTimes 
                         ? "Set specific times for your arrival and departure"
                         : "We'll assume full days (midnight to midnight)"
@@ -131,34 +131,34 @@ export default function StepOne({ data, onChange }: StepOneProps) {
             {specifyTimes && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fadeIn">
                     <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">
+                        <label className="block text-sm font-medium text-(--text-secondary) transition-colors duration-300">
                             Arrival Time {startDate && `on ${parseLocalDate(startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
                         </label>
                         <input
                             type="time"
                             value={arrivalTime}
                             onChange={(e) => setArrivalTime(e.target.value)}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                            className="w-full px-4 py-3 border border-(--border-primary) bg-(--bg-input) text-(--text-primary) rounded-lg focus:ring-2 focus:ring-(--accent) focus:border-transparent transition-all"
                         />
                     </div>
 
                     <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-700">
+                        <label className="block text-sm font-medium text-(--text-secondary) transition-colors duration-300">
                             Departure Time {endDate && `on ${parseLocalDate(endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
                         </label>
                         <input
                             type="time"
                             value={leaveTime}
                             onChange={(e) => setLeaveTime(e.target.value)}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                            className="w-full px-4 py-3 border border-(--border-primary) bg-(--bg-input) text-(--text-primary) rounded-lg focus:ring-2 focus:ring-(--accent) focus:border-transparent transition-all"
                         />
                     </div>
                 </div>
             )}
 
             {/* Quick Select Buttons */}
-            <div className="border-t pt-6">
-                <p className="text-sm font-medium text-gray-700 mb-3">Quick select:</p>
+            <div className="border-t border-(--border-primary) pt-6 transition-colors duration-300">
+                <p className="text-sm font-medium text-(--text-secondary) mb-3 transition-colors duration-300">Quick select:</p>
                 <div className="flex flex-wrap gap-2">
                     {['Today', 'Tomorrow', 'This Weekend', 'Next Week'].map((option) => (
                         <button
@@ -201,7 +201,7 @@ export default function StepOne({ data, onChange }: StepOneProps) {
                                 setStartDate(formatDate(start));
                                 setEndDate(formatDate(end));
                             }}
-                            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full text-sm transition-colors"
+                            className="px-4 py-2 bg-(--bg-secondary) hover:bg-(--bg-hover) text-(--text-primary) rounded-full text-sm transition-colors"
                         >
                             {option}
                         </button>

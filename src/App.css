@@ -1,5 +1,89 @@
 @import "tailwindcss";
 
+/* ========================================
+   THEME COLORS - CSS Custom Properties
+   ======================================== */
+@theme {
+  /* Light mode colors (default) */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f5f5f5;
+  --color-bg-tertiary: #e8e8e8;
+  --color-bg-card: #ffffff;
+  --color-bg-input: #ffffff;
+  --color-bg-hover: rgba(0, 0, 0, 0.05);
+  
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #4a4a4a;
+  --color-text-muted: #8a8a8a;
+  --color-text-inverse: #ffffff;
+  
+  --color-border-primary: #e0e0e0;
+  --color-border-secondary: rgba(0, 0, 0, 0.1);
+  --color-border-accent: rgba(0, 212, 170, 0.3);
+  
+  --color-accent: #00d4aa;
+  --color-accent-hover: #00b892;
+  --color-accent-muted: rgba(0, 212, 170, 0.1);
+  
+  --color-danger: #ff4d4d;
+  --color-warning: #ffb347;
+  --color-success: #00d4aa;
+}
+
+/* Light mode (default) root variables */
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-tertiary: #e8e8e8;
+  --bg-card: #ffffff;
+  --bg-input: #ffffff;
+  --bg-hover: rgba(0, 0, 0, 0.05);
+  
+  --text-primary: #1a1a1a;
+  --text-secondary: #4a4a4a;
+  --text-muted: #8a8a8a;
+  --text-inverse: #ffffff;
+  
+  --border-primary: #e0e0e0;
+  --border-secondary: rgba(0, 0, 0, 0.1);
+  --border-accent: rgba(0, 212, 170, 0.3);
+  
+  --accent: #00d4aa;
+  --accent-hover: #00b892;
+  --accent-muted: rgba(0, 212, 170, 0.1);
+  
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* Dark mode root variables */
+:root.dark {
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #121212;
+  --bg-tertiary: #1a1a1a;
+  --bg-card: #0f0f0f;
+  --bg-input: rgba(255, 255, 255, 0.05);
+  --bg-hover: rgba(255, 255, 255, 0.08);
+  
+  --text-primary: #ffffff;
+  --text-secondary: #b0b0b0;
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --text-inverse: #0a0a0a;
+  
+  --border-primary: rgba(255, 255, 255, 0.1);
+  --border-secondary: rgba(255, 255, 255, 0.05);
+  --border-accent: rgba(0, 212, 170, 0.3);
+  
+  --accent: #00d4aa;
+  --accent-hover: #00e5bb;
+  --accent-muted: rgba(0, 212, 170, 0.15);
+  
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
 * {
   font-family: HelveticaNeue, Helvetica, Inter, Arial, sans-serif;
 }
@@ -14,6 +98,9 @@ body,
 body {
   font-family: Helvetica, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   overflow: hidden;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .app {
@@ -23,13 +110,17 @@ body {
   overflow: hidden;
   display: grid;
   grid-template-columns: 1fr 1fr;
+  background-color: var(--bg-primary);
+  transition: background-color 0.3s ease;
 }
 
 .app-left-panel {
     position: relative;
     height: 100%;
     overflow: hidden;
-    border-right: 1px solid rgba(0, 212, 170, 0.2);
+    border-right: 1px solid var(--border-primary);
+    background-color: var(--bg-primary);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 /* Dual Panel Container - Discovery + Itinerary side by side */
@@ -45,7 +136,7 @@ body {
 .discovery-column {
   flex: 1.2;
   /* Slightly wider for the grid */
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 1px solid var(--border-primary);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -57,24 +148,27 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #0a0a0a;
+  background: var(--bg-secondary);
+  transition: background-color 0.3s ease;
 }
 
 /* Column Headers */
 .column-header {
   padding: 20px;
-  background: #0a0a0a;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
   display: flex;
   align-items: center;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .column-header h2 {
   font-size: 16px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--text-primary);
   margin: 0;
   letter-spacing: 0.5px;
+  transition: color 0.3s ease;
 }
 
 /* Global Search Container */
@@ -84,27 +178,27 @@ body {
   left: 0;
   right: 0;
   padding: 16px 20px 20px;
-  background: rgba(5, 5, 5, 0.95);
-  /* Slight transparency with blur */
+  background: var(--bg-primary);
   backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--border-primary);
   z-index: 100;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-lg);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .search-wrapper {
   display: flex;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--bg-input);
+  border: 1px solid var(--border-primary);
   border-radius: 12px;
   overflow: hidden;
   transition: all 0.2s ease;
 }
 
 .search-wrapper:focus-within {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: #00d4aa;
-  box-shadow: 0 0 0 1px #00d4aa, 0 4px 12px rgba(0, 212, 170, 0.1);
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), var(--shadow-md);
 }
 
 .global-search-input {
@@ -112,20 +206,21 @@ body {
   background: transparent;
   border: none;
   padding: 16px;
-  color: #fff;
+  color: var(--text-primary);
   font-size: 14px;
   outline: none;
+  transition: color 0.3s ease;
 }
 
 .global-search-input::placeholder {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-muted);
 }
 
 .global-search-btn {
   padding: 0 20px;
   background: transparent;
   border: none;
-  color: #00d4aa;
+  color: var(--accent);
   font-size: 18px;
   cursor: pointer;
   transition: all 0.2s;
@@ -135,7 +230,7 @@ body {
 }
 
 .global-search-btn:hover {
-  background: rgba(0, 212, 170, 0.1);
+  background: var(--accent-muted);
 }
 
 .global-search-btn:disabled {
@@ -158,7 +253,7 @@ body {
 
     .app-left-panel {
         border-right: none;
-        border-top: 1px solid rgba(0, 212, 170, 0.2);
+        border-top: 1px solid var(--border-accent);
         order: 2;
     }
 
@@ -176,12 +271,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border-primary);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--text-muted);
 }
 
 @media (max-width: 1200px) {
@@ -192,7 +287,7 @@ body {
 
   .app-left-panel {
     border-right: none;
-    border-bottom: 1px solid rgba(0, 212, 170, 0.2);
+    border-bottom: 1px solid var(--border-accent);
   }
 }
 
@@ -203,7 +298,7 @@ body {
 
   .discovery-column {
     border-right: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid var(--border-primary);
     flex: 1;
   }
 }

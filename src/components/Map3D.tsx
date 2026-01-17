@@ -20,6 +20,8 @@ mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
 interface Map3DProps {
   settings: CitySettings;
   selectedLocation?: { location: [number, number]; name: string } | null;
+  isDarkMode: boolean;
+  setIsDarkMode: (value: boolean) => void;
 }
 
 // Boston downtown center
@@ -104,7 +106,7 @@ function lerpColor(c1: string, c2: string, t: number): string {
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 }
 
-export default function Map3D({ settings, selectedLocation }: Map3DProps) {
+export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDarkMode }: Map3DProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -128,7 +130,6 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
   const [showTransitLayers, setShowTransitLayers] = useState(true);
   const [showEvents, setShowEvents] = useState(false);
   const [is3DMode, setIs3DMode] = useState(true);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
 
   // Generate vascular light trail segments with speed-linked pulse

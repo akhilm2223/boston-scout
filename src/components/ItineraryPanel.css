@@ -3,9 +3,10 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #050505;
-  color: #fff;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   overflow: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Empty State */
@@ -15,19 +16,19 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-muted);
   gap: 12px;
 }
 
 .empty-title {
   font-size: 16px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-secondary);
 }
 
 .empty-hint {
   font-size: 13px;
-  color: #00d4aa;
+  color: var(--accent);
 }
 
 /* List Container */
@@ -46,7 +47,7 @@
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-hover);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -54,19 +55,19 @@
 }
 
 .itinerary-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-tertiary);
   transform: translateY(-1px);
 }
 
 .itinerary-item.selected {
-  background: rgba(0, 212, 170, 0.1);
-  border-color: rgba(0, 212, 170, 0.3);
+  background: var(--accent-muted);
+  border-color: var(--border-accent);
 }
 
 .itinerary-item.dragging {
   opacity: 0.5;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px dashed rgba(255, 255, 255, 0.3);
+  background: var(--bg-hover);
+  border: 1px dashed var(--border-primary);
 }
 
 /* Drag Handle */
@@ -87,7 +88,7 @@
 .grip-dot {
   width: 2px;
   height: 2px;
-  background-color: #fff;
+  background-color: var(--text-primary);
   border-radius: 50%;
 }
 
@@ -107,16 +108,17 @@
 .item-name {
   font-size: 14px;
   font-weight: 500;
-  color: #fff;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   margin-right: 8px;
+  transition: color 0.3s ease;
 }
 
 .item-time {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
@@ -124,7 +126,7 @@
 .remove-btn-v2 {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-muted);
   font-size: 18px;
   cursor: pointer;
   padding: 4px;
@@ -141,23 +143,24 @@
 }
 
 .remove-btn-v2:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--bg-hover);
   color: #ff4d4d;
 }
 
 /* Footer */
 .itinerary-footer {
   padding: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--border-primary);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #0a0a0a;
+  background: var(--bg-secondary);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .item-count {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-muted);
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Map3D from './components/Map3D';
 import MapErrorBoundary from './components/MapErrorBoundary';
 import ItineraryPanel from './components/ItineraryPanel';
@@ -45,6 +45,19 @@ function App() {
     walkingTimeMinutes: 10,
     walkingDistanceMiles: 0.5, // 10 min * 3 mph / 60 = 0.5 miles
   });
+
+  // Dark mode state - controls theme across the entire app
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Apply dark mode class to document element
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDarkMode]);
+
   const [settings] = useState<CitySettings>({
     timeOfDay: 20,
     weather: 'clear',
@@ -82,7 +95,7 @@ function App() {
   }, []);
 
   return (
-    <div className="app">
+    <div className={`app ${isDarkMode ? 'dark' : 'light'}`}>
       {/* Left Panel: Results + Itinerary Side by Side */}
       <div className="app-left-panel">
             <ItineraryPanel
@@ -103,6 +116,8 @@ function App() {
           <Map3D
             settings={settings}
             selectedLocation={selectedLocation}
+            isDarkMode={isDarkMode}
+            setIsDarkMode={setIsDarkMode}
           />
         </MapErrorBoundary>
       </div>
