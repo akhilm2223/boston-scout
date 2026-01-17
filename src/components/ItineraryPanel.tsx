@@ -22,6 +22,7 @@ interface ItineraryStop {
 }
 
 interface ItineraryPanelProps {
+  dates: { start: Date; end: Date };
   onLocationClick: (location: [number, number], name: string) => void;
 }
 

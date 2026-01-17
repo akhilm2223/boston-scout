@@ -18,6 +18,11 @@ export interface CitySettings {
 }
 
 function App() {
+
+  const dates = useState<{ start: Date; end: Date }>({
+    start: new Date(),
+    end: new Date(),
+  });
   const [settings] = useState<CitySettings>({
     timeOfDay: 20,
     weather: 'clear',
@@ -44,7 +49,7 @@ function App() {
     <div className="app">
       {/* Left Panel: Itinerary & Chat */}
       <div className="app-left-panel">
-        <ItineraryPanel onLocationClick={handleLocationClick} />
+        <ItineraryPanel dates={dates} onLocationClick={handleLocationClick} />
       </div>
 
       {/* Right Panel: 3D Map */}
