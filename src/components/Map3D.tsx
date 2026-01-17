@@ -7,6 +7,9 @@ import {
   vehiclesToGeoJSON, stopsToGeoJSON,
   type MBTARoute, type MBTAAlert
 } from '../services/mbtaApi';
+import { fetchRestaurants, restaurantsToGeoJSON } from '../services/restaurantApi';
+import { fetchEvents, eventsToGeoJSON, formatEventDate, formatEventTime } from '../services/eventsApi';
+import { generateRestaurantInsightHTML } from '../services/geminiApi';
 import { MBTA_STATIC_TRACKS } from '../data/mbtaStaticTracks';
 import './Map3D.css';
 
@@ -112,6 +115,9 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
 
   const [systemStress, setSystemStress] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showRestaurants, setShowRestaurants] = useState(true);
+  const [showTransitLayers, setShowTransitLayers] = useState(true);
+  const [showEvents, setShowEvents] = useState(true);
 
   // Generate vascular light trail segments with speed-linked pulse
   const generateLightTrails = useCallback((
@@ -212,6 +218,13 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
     mapInstance.on('style.load', () => {
       // Load the 3D Subway Model - Absolute path from public root
       mapInstance.addModel('subway-model', '/models/subway.glb');
+      
+      // Try to load the 3D Human Model (optional - only if file exists)
+      try {
+        mapInstance.addModel('human-model', '/models/human.glb');
+      } catch (error) {
+        console.log('[Human Model] Not loaded - file may not exist yet');
+      }
 
       // Add standard lighting for 3D models (needed for simple GLB visibility)
       if (!mapInstance.getLayer('sky')) {
@@ -234,9 +247,69 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
     mapInstance.on('style.load', () => {
       // Load the 3D Subway Model
       mapInstance.addModel('subway-model', './models/subway.glb');
+      
+      // Try to load the 3D Human Model (optional)
+      try {
+        mapInstance.addModel('human-model', './models/human.glb');
+      } catch (error) {
+        console.log('[Human Model] Not loaded - file may not exist yet');
+      }
     });
 
     mapInstance.on('load', async () => {
+
+      // ===========================================
+      // CINEMATIC HELICOPTER TOUR ON LOAD
+      // ===========================================
+      
+      // Wait a moment for everything to settle
+      setTimeout(() => {
+        // Define tour waypoints around Boston
+        const tourWaypoints = [
+          // Start: High above Boston, looking down
+          { center: [-71.0589, 42.3601], zoom: 12, pitch: 60, bearing: 0, duration: 3000 },
+          // North: Fly over North End
+          { center: [-71.0536, 42.3656], zoom: 13, pitch: 65, bearing: 90, duration: 4000 },
+          // East: Over Harbor
+          { center: [-71.0400, 42.3584], zoom: 13, pitch: 65, bearing: 180, duration: 4000 },
+          // South: Over South End
+          { center: [-71.0700, 42.3400], zoom: 13, pitch: 65, bearing: 270, duration: 4000 },
+          // West: Back Bay
+          { center: [-71.0800, 42.3500], zoom: 13, pitch: 65, bearing: 360, duration: 4000 },
+          // Final: Zoom to human at Boston Common
+          { center: [-71.0657, 42.3550], zoom: 17, pitch: 75, bearing: 45, duration: 3000 }
+        ];
+
+        let currentWaypoint = 0;
+
+        const flyToNextWaypoint = () => {
+          if (currentWaypoint >= tourWaypoints.length) {
+            console.log('[Helicopter Tour] Complete!');
+            return;
+          }
+
+          const waypoint = tourWaypoints[currentWaypoint];
+          
+          mapInstance.flyTo({
+            center: waypoint.center as [number, number],
+            zoom: waypoint.zoom,
+            pitch: waypoint.pitch,
+            bearing: waypoint.bearing,
+            duration: waypoint.duration,
+            essential: true,
+            easing: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t // Smooth ease in-out
+          });
+
+          currentWaypoint++;
+          
+          // Move to next waypoint after current animation completes
+          setTimeout(flyToNextWaypoint, waypoint.duration);
+        };
+
+        // Start the tour
+        console.log('[Helicopter Tour] Starting...');
+        flyToNextWaypoint();
+      }, 1000); // Wait 1 second after map loads
 
       // ===========================================
       // MBTA VASCULAR TRACKS ("River of Light")
@@ -565,6 +638,394 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
       });
 
       // ===========================================
+      // 3D HUMAN MODEL - Live Location Marker
+      // ===========================================
+      
+      // Boston Common center coordinates (your live location)
+      const humanLocation: [number, number] = [-71.0657, 42.3550];
+      
+      mapInstance.addSource('human-location', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: [{
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: humanLocation
+            },
+            properties: {
+              bearing: 0 // Can be updated for rotation
+            }
+          }]
+        }
+      });
+
+      // 3D Human Model Layer
+      mapInstance.addLayer({
+        id: 'human-3d',
+        type: 'model',
+        source: 'human-location',
+        layout: {
+          'model-id': 'human-model'
+        },
+        paint: {
+          // 10x larger scale - giant visible human
+          'model-scale': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            14, ['literal', [15, 15, 15]],   // 10x at city view
+            16, ['literal', [30, 30, 30]],   // 10x at street view
+            18, ['literal', [45, 45, 45]]    // 10x when zoomed in
+          ],
+          'model-rotation': [0, 0, ['get', 'bearing']],
+          'model-emissive-strength': 1.2,
+          'model-opacity': 1
+        }
+      });
+
+      // Pulsing circle around human (live location indicator)
+      mapInstance.addLayer({
+        id: 'human-pulse',
+        type: 'circle',
+        source: 'human-location',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 8, 18, 20],
+          'circle-color': '#00f3ff',
+          'circle-blur': 1,
+          'circle-opacity': 0.4,
+        },
+        minzoom: 14,
+      });
+
+      // ===========================================
+      // RESTAURANT MARKERS
+      // ===========================================
+
+      mapInstance.addSource('restaurants', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      // Restaurant glow (rating-based color)
+      mapInstance.addLayer({
+        id: 'restaurants-glow',
+        type: 'circle',
+        source: 'restaurants',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 3, 16, 6],
+          'circle-color': ['get', 'markerColor'],
+          'circle-blur': 1,
+          'circle-opacity': 0.3,
+        },
+        minzoom: 13,
+      });
+
+      // Restaurant marker
+      mapInstance.addLayer({
+        id: 'restaurants-marker',
+        type: 'circle',
+        source: 'restaurants',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 1.5, 16, 3],
+          'circle-color': ['get', 'markerColor'],
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 1,
+        },
+        minzoom: 13,
+      });
+
+      // Restaurant labels (show at higher zoom)
+      mapInstance.addLayer({
+        id: 'restaurants-label',
+        type: 'symbol',
+        source: 'restaurants',
+        layout: {
+          'text-field': ['get', 'name'],
+          'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+          'text-size': 11,
+          'text-offset': [0, 1.2],
+          'text-anchor': 'top',
+          'text-max-width': 12,
+        },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': '#000000',
+          'text-halo-width': 1.5,
+        },
+        minzoom: 15,
+      });
+
+      // ===========================================
+      // EVENT MARKERS (3D "E" Text)
+      // ===========================================
+
+      mapInstance.addSource('events', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      // Event glow (subtle gray)
+      mapInstance.addLayer({
+        id: 'events-glow',
+        type: 'circle',
+        source: 'events',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 6, 16, 12],
+          'circle-color': '#d1d5db',
+          'circle-blur': 1,
+          'circle-opacity': 0.3,
+        },
+        minzoom: 12,
+      });
+
+      // Event 3D "E" text marker (plain white)
+      mapInstance.addLayer({
+        id: 'events-marker',
+        type: 'symbol',
+        source: 'events',
+        layout: {
+          'text-field': 'E',
+          'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+          'text-size': 20,
+          'text-allow-overlap': true,
+        },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': '#000000',
+          'text-halo-width': 2,
+        },
+        minzoom: 12,
+      });
+
+      // Event labels (show at higher zoom)
+      mapInstance.addLayer({
+        id: 'events-label',
+        type: 'symbol',
+        source: 'events',
+        layout: {
+          'text-field': ['get', 'title'],
+          'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+          'text-size': 11,
+          'text-offset': [0, 1.8],
+          'text-anchor': 'top',
+          'text-max-width': 12,
+        },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': '#000000',
+          'text-halo-width': 1.5,
+        },
+        minzoom: 14,
+      });
+
+      // Event click interaction
+      mapInstance.on('click', 'events-marker', (e) => {
+        if (!e.features || e.features.length === 0) return;
+
+        const props = e.features[0].properties;
+        const coordinates = (e.features[0].geometry as any).coordinates.slice();
+
+        const startDate = formatEventDate(props.startTime);
+        const startTime = formatEventTime(props.startTime);
+        const endTime = formatEventTime(props.endTime);
+
+        const popupHTML = `
+          <div class="event-popup" style="min-width: 280px; max-width: 320px; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;">
+            <div style="padding: 4px 0;">
+              <div style="display: inline-block; padding: 5px 12px; background: #000; color: #fff; border-radius: 5px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px;">
+                Event
+              </div>
+              
+              <h3 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 700; color: #000; line-height: 1.3; letter-spacing: -0.3px;">
+                ${props.title}
+              </h3>
+              
+              <div style="margin: 12px 0; display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 15px;">📅</span>
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                  <span style="font-size: 14px; color: #000; font-weight: 700;">${startDate}</span>
+                  <span style="font-size: 12px; color: #666; font-weight: 500;">${startTime} - ${endTime}</span>
+                </div>
+              </div>
+              
+              <div style="margin: 12px 0; display: flex; align-items: start; gap: 10px;">
+                <span style="font-size: 15px; color: #000; margin-top: 2px;">📍</span>
+                <span style="font-size: 13px; color: #000; font-weight: 600; line-height: 1.5;">${props.venueName}</span>
+              </div>
+              
+              ${props.description ? `<div style="margin: 14px 0; padding: 12px; background: #fafafa; border-radius: 6px; border-left: 3px solid #000;">
+                <div style="font-size: 13px; color: #1a1a1a; line-height: 1.6; font-weight: 500;">
+                  ${props.description.substring(0, 150)}${props.description.length > 150 ? '...' : ''}
+                </div>
+              </div>` : ''}
+              
+              ${props.price && props.price !== 'Free' ? `<div style="margin: 12px 0; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 11px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Price:</span>
+                <span style="font-size: 14px; color: #000; font-weight: 700;">${props.price}</span>
+              </div>` : props.price === 'Free' ? `<div style="margin: 12px 0;">
+                <span style="display: inline-block; padding: 4px 10px; background: #f0f0f0; color: #000; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px;">FREE EVENT</span>
+              </div>` : ''}
+              
+              ${props.sourceUrl ? `<div style="margin-top: 16px; padding-top: 16px; border-top: 2px solid #e5e7eb;">
+                <a href="${props.sourceUrl}" target="_blank" style="display: block; text-align: center; padding: 11px 16px; background: #000; color: #fff; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700; transition: all 0.2s; letter-spacing: 0.5px;">
+                  View Details
+                </a>
+              </div>` : ''}
+            </div>
+          </div>
+        `;
+
+        new mapboxgl.Popup({ maxWidth: '340px', className: 'event-popup-container' })
+          .setLngLat(coordinates)
+          .setHTML(popupHTML)
+          .addTo(mapInstance);
+      });
+
+      // Cursor change on event hover
+      mapInstance.on('mouseenter', 'events-marker', () => {
+        mapInstance.getCanvas().style.cursor = 'pointer';
+      });
+
+      mapInstance.on('mouseleave', 'events-marker', () => {
+        mapInstance.getCanvas().style.cursor = '';
+      });
+
+      // Restaurant click interaction
+      mapInstance.on('click', 'restaurants-marker', async (e) => {
+        if (!e.features || e.features.length === 0) return;
+
+        const props = e.features[0].properties;
+        const coordinates = (e.features[0].geometry as any).coordinates.slice();
+
+        // Build rating stars (black and white)
+        const rating = props.rating || 0;
+        const fullStars = Math.floor(rating);
+        const hasHalfStar = rating % 1 >= 0.5;
+        let starsHTML = '';
+        for (let i = 0; i < 5; i++) {
+          if (i < fullStars) {
+            starsHTML += '<span style="color: #000;">★</span>';
+          } else if (i === fullStars && hasHalfStar) {
+            starsHTML += '<span style="color: #000;">⯨</span>';
+          } else {
+            starsHTML += '<span style="color: #d1d5db;">★</span>';
+          }
+        }
+
+        // Price level (black)
+        const priceLevel = props.priceLevel > 0 ? '<span style="color: #000; font-weight: 700; font-size: 14px;">' + '$'.repeat(props.priceLevel) + '</span>' : '';
+        
+        // Features badges (black and white)
+        let badges = [];
+        if (props.dineIn) badges.push('<span class="badge">Dine-in</span>');
+        if (props.takeout) badges.push('<span class="badge">Takeout</span>');
+        if (props.delivery) badges.push('<span class="badge">Delivery</span>');
+        if (props.reservable) badges.push('<span class="badge">Reservations</span>');
+        if (props.outdoor) badges.push('<span class="badge">Outdoor</span>');
+        if (props.groups) badges.push('<span class="badge">Groups</span>');
+        
+        // Photo URL (black and white gradient fallback)
+        const photoHTML = props.photoName ? 
+          `<div class="popup-photo" style="width: 100%; height: 140px; background: linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%); border-radius: 8px 8px 0 0; margin: -12px -16px 12px -16px; position: relative; overflow: hidden;">
+            <img src="https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${props.photoName}&key=YOUR_GOOGLE_API_KEY" 
+                 style="width: 100%; height: 100%; object-fit: cover; filter: grayscale(100%);" 
+                 onerror="this.parentElement.style.background='linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%)'; this.style.display='none';" />
+            <div style="position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); padding: 5px 10px; border-radius: 6px; font-size: 12px; color: #000; font-weight: 700; border: 1px solid #e5e7eb;">
+              ${starsHTML} <span style="margin-left: 4px;">${rating.toFixed(1)}</span>
+            </div>
+          </div>` 
+          : '';
+        
+        // Generate Gemini insight
+        const insightHTML = await generateRestaurantInsightHTML(
+          props.name,
+          props.categories || '',
+          rating,
+          props.city
+        );
+        
+        const popupHTML = `
+          <div class="restaurant-popup" style="min-width: 280px; max-width: 320px; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;">
+            ${photoHTML}
+            
+            <div style="padding: ${photoHTML ? '0' : '4px 0'};">
+              <h3 style="margin: 0 0 10px 0; font-size: 18px; font-weight: 700; color: #000; line-height: 1.3; letter-spacing: -0.3px;">
+                ${props.name}
+              </h3>
+              
+              ${!photoHTML ? `<div style="margin: 10px 0; display: flex; align-items: center; gap: 10px;">
+                <div style="font-size: 15px; line-height: 1;">${starsHTML}</div>
+                <span style="font-size: 15px; font-weight: 700; color: #000;">${rating > 0 ? rating.toFixed(1) : 'No rating'}</span>
+                ${props.ratingCount > 0 ? `<span style="font-size: 13px; color: #666; font-weight: 500;">(${props.ratingCount})</span>` : ''}
+                ${priceLevel ? `<span style="margin-left: auto;">${priceLevel}</span>` : ''}
+              </div>` : ''}
+              
+              <div style="margin: 10px 0; display: flex; align-items: start; gap: 8px;">
+                <span style="font-size: 14px; color: #000; margin-top: 1px;">📍</span>
+                <span style="font-size: 13px; color: #000; font-weight: 500; line-height: 1.4;">${props.address}, ${props.city}</span>
+              </div>
+              
+              ${props.categories ? `<div style="margin: 10px 0; font-size: 12px; color: #4a4a4a; line-height: 1.5; font-weight: 500;">
+                ${props.categories.split(',').slice(0, 3).join(' • ')}
+              </div>` : ''}
+              
+              ${insightHTML}
+              
+              ${badges.length > 0 ? `<div style="margin: 12px 0; display: flex; flex-wrap: wrap; gap: 6px;">
+                ${badges.join('')}
+              </div>` : ''}
+              
+              <div style="margin-top: 14px; padding-top: 14px; border-top: 2px solid #e5e7eb; display: flex; gap: 8px;">
+                ${props.phone ? `<a href="tel:${props.phone}" style="flex: 1; text-align: center; padding: 10px 14px; background: #000; color: #fff; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700; transition: all 0.2s; letter-spacing: 0.3px;">
+                  Call
+                </a>` : ''}
+                ${props.googleMapsUrl ? `<a href="${props.googleMapsUrl}" target="_blank" style="flex: 1; text-align: center; padding: 10px 14px; background: #fff; color: #000; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700; border: 2px solid #000; transition: all 0.2s; letter-spacing: 0.3px;">
+                  Directions
+                </a>` : ''}
+              </div>
+            </div>
+          </div>
+          
+          <style>
+            .badge {
+              display: inline-block;
+              padding: 5px 10px;
+              background: #f5f5f5;
+              color: #000;
+              border-radius: 5px;
+              font-size: 11px;
+              font-weight: 600;
+              border: 1.5px solid #d1d5db;
+              letter-spacing: 0.2px;
+            }
+            .restaurant-popup a:hover {
+              transform: translateY(-1px);
+              box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            }
+            .restaurant-popup a:active {
+              transform: translateY(0);
+            }
+          </style>
+        `;
+
+        new mapboxgl.Popup({ maxWidth: '340px', className: 'restaurant-popup-container' })
+          .setLngLat(coordinates)
+          .setHTML(popupHTML)
+          .addTo(mapInstance);
+      });
+
+      // Cursor change on restaurant hover
+      mapInstance.on('mouseenter', 'restaurants-marker', () => {
+        mapInstance.getCanvas().style.cursor = 'pointer';
+      });
+
+      mapInstance.on('mouseleave', 'restaurants-marker', () => {
+        mapInstance.getCanvas().style.cursor = '';
+      });
+
+      // ===========================================
       // BUILDING CLICK INTERACTION
       // ===========================================
 
@@ -608,26 +1069,161 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
       });
 
       // ===========================================
-      // VEHICLE CLICK INTERACTION - Ghost Guard
+      // VEHICLE CLICK INTERACTION - Detailed Info
       // ===========================================
-      // Update to listen to 3D model layer
       mapInstance.on('click', 'mbta-subway-3d', (e) => {
         if (!e.features || e.features.length === 0) return;
 
         // Ghost Point Guard: Don't interact with invisible trains
-        const properties = e.features[0].properties;
-        if (properties?.opacity === 0) return;
+        const props = e.features[0].properties;
+        if (props?.opacity === 0) return;
 
-        // Perform interaction (e.g. fly to, or show popup)
-        const vehicleId = properties?.id;
-        console.log('[MBTA] Clicked vehicle:', vehicleId, 'Route:', properties?.routeId);
+        const coordinates = (e.features[0].geometry as any).coordinates.slice();
 
+        // Get vehicle type icon
+        let vehicleIcon = '🚇';
+        let vehicleTypeName = 'Subway';
+        if (props.vehicleType === 'lightrail') {
+          vehicleIcon = '🚊';
+          vehicleTypeName = 'Light Rail';
+        } else if (props.vehicleType === 'commuter') {
+          vehicleIcon = '🚆';
+          vehicleTypeName = 'Commuter Rail';
+        } else if (props.vehicleType === 'bus') {
+          vehicleIcon = '🚌';
+          vehicleTypeName = 'Bus';
+        } else if (props.vehicleType === 'ferry') {
+          vehicleIcon = '⛴️';
+          vehicleTypeName = 'Ferry';
+        }
+
+        // Status text
+        let statusText = 'In Transit';
+        if (props.status === 'STOPPED_AT') statusText = 'Stopped at Station';
+        else if (props.status === 'INCOMING_AT') statusText = 'Arriving Soon';
+
+        // Occupancy/crowding
+        let crowdingText = 'Unknown';
+        let crowdingColor = '#666';
+        if (props.occupancy === 'MANY_SEATS_AVAILABLE') {
+          crowdingText = 'Plenty of Seats';
+          crowdingColor = '#10b981';
+        } else if (props.occupancy === 'FEW_SEATS_AVAILABLE') {
+          crowdingText = 'Few Seats';
+          crowdingColor = '#f59e0b';
+        } else if (props.occupancy === 'STANDING_ROOM_ONLY') {
+          crowdingText = 'Standing Room';
+          crowdingColor = '#ef4444';
+        } else if (props.occupancy === 'FULL') {
+          crowdingText = 'Full';
+          crowdingColor = '#dc2626';
+        }
+
+        const popupHTML = `
+          <div class="transit-popup" style="min-width: 260px; max-width: 300px; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;">
+            <div style="padding: 4px 0;">
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                <span style="font-size: 32px;">${vehicleIcon}</span>
+                <div>
+                  <div style="font-size: 11px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">
+                    ${vehicleTypeName}
+                  </div>
+                  <h3 style="margin: 2px 0 0 0; font-size: 18px; font-weight: 700; color: #000; line-height: 1.2;">
+                    ${props.label || 'Vehicle ' + props.id.substring(0, 8)}
+                  </h3>
+                </div>
+              </div>
+              
+              <div style="margin: 12px 0; padding: 10px; background: #fafafa; border-radius: 6px; border-left: 3px solid ${props.routeColor || '#000'};">
+                <div style="font-size: 12px; font-weight: 700; color: #000; margin-bottom: 4px;">
+                  ${props.routeName || props.routeId}
+                </div>
+                <div style="font-size: 11px; color: #666; font-weight: 500;">
+                  ${statusText}
+                </div>
+              </div>
+              
+              ${props.speed > 0 ? `<div style="margin: 10px 0; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 14px;">⚡</span>
+                <span style="font-size: 13px; color: #000; font-weight: 600;">${Math.round(props.speed)} mph</span>
+              </div>` : ''}
+              
+              <div style="margin: 10px 0; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 14px;">👥</span>
+                <span style="font-size: 13px; color: ${crowdingColor}; font-weight: 600;">${crowdingText}</span>
+              </div>
+              
+              ${props.carriageCount > 0 ? `<div style="margin: 10px 0; font-size: 12px; color: #666;">
+                ${props.carriageCount} car${props.carriageCount > 1 ? 's' : ''}
+              </div>` : ''}
+            </div>
+          </div>
+        `;
+
+        new mapboxgl.Popup({ maxWidth: '320px', className: 'transit-popup-container' })
+          .setLngLat(coordinates)
+          .setHTML(popupHTML)
+          .addTo(mapInstance);
+
+        // Also fly to the vehicle
         mapInstance.flyTo({
-          center: (e.features[0].geometry as any).coordinates,
+          center: coordinates,
           zoom: 17,
           pitch: 60,
+          duration: 1500,
           essential: true
         });
+      });
+
+      // ===========================================
+      // STATION/STOP CLICK INTERACTION
+      // ===========================================
+      mapInstance.on('click', 'stops-marker', (e) => {
+        if (!e.features || e.features.length === 0) return;
+
+        const props = e.features[0].properties;
+        const coordinates = (e.features[0].geometry as any).coordinates.slice();
+
+        const popupHTML = `
+          <div class="station-popup" style="min-width: 240px; max-width: 280px; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;">
+            <div style="padding: 4px 0;">
+              <div style="display: inline-block; padding: 4px 10px; background: #000; color: #fff; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">
+                Station
+              </div>
+              
+              <h3 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 700; color: #000; line-height: 1.3;">
+                ${props.name}
+              </h3>
+              
+              ${props.wheelchair ? `<div style="margin: 10px 0; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 14px;">♿</span>
+                <span style="font-size: 12px; color: #10b981; font-weight: 600;">Wheelchair Accessible</span>
+              </div>` : ''}
+              
+              ${props.platformCode ? `<div style="margin: 10px 0; font-size: 12px; color: #666;">
+                Platform: <span style="font-weight: 600; color: #000;">${props.platformCode}</span>
+              </div>` : ''}
+              
+              <div style="margin-top: 12px; padding-top: 12px; border-top: 2px solid #e5e7eb; font-size: 11px; color: #666;">
+                Click for live arrivals
+              </div>
+            </div>
+          </div>
+        `;
+
+        new mapboxgl.Popup({ maxWidth: '300px', className: 'station-popup-container' })
+          .setLngLat(coordinates)
+          .setHTML(popupHTML)
+          .addTo(mapInstance);
+      });
+
+      // Cursor change on stop hover
+      mapInstance.on('mouseenter', 'stops-marker', () => {
+        mapInstance.getCanvas().style.cursor = 'pointer';
+      });
+
+      mapInstance.on('mouseleave', 'stops-marker', () => {
+        mapInstance.getCanvas().style.cursor = '';
       });
 
       // Cursor change on vehicle hover (respecting opacity)
@@ -671,13 +1267,17 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
 
       console.log('[MBTA] Loading initial data...');
       // Tracks are now STATIC - only fetch routes, alerts, and stops
-      const [routesData, alertsData, stopsData] = await Promise.all([
+      const [routesData, alertsData, stopsData, restaurantsData, eventsData] = await Promise.all([
         fetchRoutes(),
         fetchAlerts(),
         fetchStops(),
+        fetchRestaurants(),
+        fetchEvents(),
       ]);
 
       console.log('[MBTA] Data loaded - routes:', routesData.length, 'stops:', stopsData.length, 'alerts:', alertsData.length);
+      console.log('[Restaurants] Loaded:', restaurantsData.length, 'restaurants');
+      console.log('[Events] Loaded:', eventsData.length, 'events');
 
       const routeMap = new Map(routesData.map(r => [r.id, r]));
       setMbtaRoutes(routeMap);
@@ -685,6 +1285,18 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
 
       if (map.current?.getSource('mbta-stops')) {
         (map.current.getSource('mbta-stops') as mapboxgl.GeoJSONSource).setData(stopsToGeoJSON(stopsData));
+      }
+
+      // Load restaurants onto map
+      if (map.current?.getSource('restaurants')) {
+        const restaurantGeoJSON = restaurantsToGeoJSON(restaurantsData);
+        (map.current.getSource('restaurants') as mapboxgl.GeoJSONSource).setData(restaurantGeoJSON);
+      }
+
+      // Load events onto map
+      if (map.current?.getSource('events')) {
+        const eventsGeoJSON = eventsToGeoJSON(eventsData);
+        (map.current.getSource('events') as mapboxgl.GeoJSONSource).setData(eventsGeoJSON);
       }
 
       // Static tracks are already loaded - just log confirmation
@@ -954,11 +1566,12 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
   // Transit visibility toggle
   useEffect(() => {
     if (!map.current || !isLoaded) return;
-    const vis = settings.showTransit ? 'visible' : 'none';
+    const vis = settings.showTransit && showTransitLayers ? 'visible' : 'none';
     [
       'tracks-bed', 'tracks-route-glow', 'tracks-core',
       'trails-glow', 'trails-core', 'trails-head',
       'stops-glow', 'stops-marker',
+      'glow-zone',
       // Vehicle layers
       'vehicles-shadow', 'vehicles-glow',
       'bus-body', 'bus-label', 'bus-direction',
@@ -969,7 +1582,37 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
         map.current.setLayoutProperty(layer, 'visibility', vis);
       }
     });
-  }, [settings.showTransit, isLoaded]);
+  }, [settings.showTransit, showTransitLayers, isLoaded]);
+
+  // Restaurant visibility toggle
+  useEffect(() => {
+    if (!map.current || !isLoaded) return;
+    const vis = showRestaurants ? 'visible' : 'none';
+    [
+      'restaurants-glow',
+      'restaurants-marker',
+      'restaurants-label'
+    ].forEach(layer => {
+      if (map.current?.getLayer(layer)) {
+        map.current.setLayoutProperty(layer, 'visibility', vis);
+      }
+    });
+  }, [showRestaurants, isLoaded]);
+
+  // Events visibility toggle
+  useEffect(() => {
+    if (!map.current || !isLoaded) return;
+    const vis = showEvents ? 'visible' : 'none';
+    [
+      'events-glow',
+      'events-marker',
+      'events-label'
+    ].forEach(layer => {
+      if (map.current?.getLayer(layer)) {
+        map.current.setLayoutProperty(layer, 'visibility', vis);
+      }
+    });
+  }, [showEvents, isLoaded]);
 
   // Cinematic flyTo when location is selected from itinerary
   useEffect(() => {
@@ -1017,6 +1660,9 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
   // ===========================================
   // EXPAND MAP TOGGLE - Cinematic Fullscreen
   // ===========================================
+  // ===========================================
+  // EXPAND MAP TOGGLE - Cinematic Fullscreen
+  // ===========================================
   const handleExpandToggle = useCallback(() => {
     setIsExpanded(prev => {
       const newExpanded = !prev;
@@ -1052,23 +1698,49 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
     });
   }, []);
 
-  // Handler for "Back to WPI" - cinematic fly-to with 75° pitch
-  const handleBackToWPI = useCallback(() => {
-    if (map.current) {
-      map.current.flyTo({
-        center: [-71.798547, 42.262046], // Worcester Union Station
-        pitch: 75, // Cinematic pitch for itinerary fly-to
-        zoom: 14,
-        bearing: 45,
-        duration: 2500,
-        essential: true,
-      });
-    }
-  }, []);
-
   return (
     <div className={`map-wrapper ${isExpanded ? 'expanded' : ''}`}>
       <div ref={mapContainer} className="map-container" />
+
+      {/* Layer Toggle Controls */}
+      <div className="layer-toggle-controls">
+        <button
+          className={`layer-toggle-btn ${showTransitLayers ? 'active' : ''}`}
+          onClick={() => setShowTransitLayers(!showTransitLayers)}
+          title="Toggle Transit"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="6" width="18" height="12" rx="2" />
+            <path d="M3 10h18M7 14h.01M17 14h.01M7 18h10" />
+          </svg>
+          <span>Transit</span>
+        </button>
+
+        <button
+          className={`layer-toggle-btn ${showRestaurants ? 'active' : ''}`}
+          onClick={() => setShowRestaurants(!showRestaurants)}
+          title="Toggle Restaurants"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />
+          </svg>
+          <span>Restaurants</span>
+        </button>
+
+        <button
+          className={`layer-toggle-btn ${showEvents ? 'active' : ''}`}
+          onClick={() => setShowEvents(!showEvents)}
+          title="Toggle Events"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+          <span>Events</span>
+        </button>
+      </div>
 
       {/* View Full Map Toggle Button */}
       <button
@@ -1086,18 +1758,6 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
           </svg>
         )}
         <span className="btn-label">{isExpanded ? 'Downtown' : 'Full Map'}</span>
-      </button>
-
-      {/* Back to WPI Button - Always visible for parents/students */}
-      <button
-        className="back-to-wpi-btn"
-        onClick={handleBackToWPI}
-        title="Back to WPI / Worcester"
-      >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M19 12H5M12 19l-7-7 7-7" />
-        </svg>
-        <span>Back to WPI</span>
       </button>
     </div>
   );
