@@ -1,51 +1,57 @@
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import '@/components/ItineraryPanel.css';
+import "@/App.css";
 import StepOne from './StepOne'; 
 import StepTwo from './StepTwo';
-import { ItineraryEvent } from '../types';
+import { ItineraryEvent } from '../types'; 
 import EventSearchPanel from './EventSearchPanel';
-import RestaurantSearchPanel from './RestaurantSearchPanel';
 
-function validateStep(step: number, data: Record<string, any>): boolean {
+function validateStep(_step: number, _data: Record<string, unknown>): boolean {
   // Placeholder validation logic
   return true;
 }
 
 interface ItineraryPanelProps {
-  dates: { start: Date; end: Date };
   onLocationClick: (location: [number, number], name: string) => void;
   handleAddToItinerary: (event: ItineraryEvent) => void;
-  handleRemoveFromItinerary: (eventId: string) => void;
+  onRemoveEvent: (eventId: string) => void;
   customEvents?: ItineraryEvent[];
 }
 
 export default function ItineraryPanel({ 
-  dates, 
   onLocationClick, 
   handleAddToItinerary,
-  handleRemoveFromItinerary,
+  onRemoveEvent,
   customEvents = []
 }: ItineraryPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStop, setSelectedStop] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({});
-  const [errors, setErrors] = useState({});
-  const [activeTab, setActiveTab] = useState<'events' | 'restaurants'>('events');
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [items, setItems] = useState<ItineraryEvent[]>(customEvents);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Sync items with customEvents prop
+  useEffect(() => {
+    setItems(customEvents);
+  }, [customEvents]);
+
+  const handleSearchSubmit = useCallback(() => {
+    if (searchQuery.trim()) {
+      setIsSearching(true);
+      // Reset searching state after a timeout to simulate loading "handoff"
+      setTimeout(() => setIsSearching(false), 1000);
+    }
+  }, [searchQuery]);
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSearchSubmit();
+  };
 
   const handleStopClick = (stop: ItineraryEvent) => {
     setSelectedStop(stop.id);
     onLocationClick([stop.location.lat, stop.location.lng], stop.name);
-  };
-
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'transit': return '🚆';
-      case 'food': return '🍝';
-      case 'attraction': return '🏛️';
-      case 'university': return '🎓';
-      default: return '📍';
-    }
   };
 
   const totalSteps = 4;
@@ -53,9 +59,26 @@ export default function ItineraryPanel({
   const handleNext = () => {
     if (validateStep(currentStep, formData)) {
       setCurrentStep(prev => Math.min(prev + 1, totalSteps));
-    } else {
-      setErrors(errors => ({ ...errors, [currentStep]: 'Please fix errors before proceeding.' }));
     }
+  };
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    const newItems = [...items];
+    const draggedItem = newItems[draggedIndex];
+    newItems.splice(draggedIndex, 1);
+    newItems.splice(index, 0, draggedItem);
+    setItems(newItems);
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
   };
 
   const handlePrev = () => {
@@ -67,7 +90,7 @@ export default function ItineraryPanel({
 			<div className="p-2">
 				<div className="text-2xl font-bold">Your Current Itinerary</div>
 			</div>
-			<div className="flex overflow-auto relative">
+			<div className="flex overflow-auto relative flex-1">
 				{currentStep === 1 && (
 					<StepOne data={formData} onChange={setFormData} />
 				)}
@@ -75,121 +98,106 @@ export default function ItineraryPanel({
 					<StepTwo data={formData} onChange={setFormData} />
 				)}
 				{currentStep === 3 && (
-					<div className="w-full h-full flex flex-row">
-						<div className="space-y-2 p-2 flex flex-col w-full overflow-auto relative">
-							{filteredStops.map((stop, index) => (
-								<div
-									key={stop.id}
-									className={`relative cursor-pointer transition-all duration-300 ease-in-out px-4 py-5 rounded-lg border ${selectedStop === stop.id ? "selected" : ""} ${stop.sentiment}`}
-									onClick={() => handleStopClick(stop)}
-								>
-									<div className="flex flex-col gap-2">
-										<div className="">
-											<h3 className="">{stop.name}</h3>
-											<span className="">
-												{stop.time}
-											</span>
-										</div>
+					<div className="dual-panel-container">
+						{/* Discovery Column (4-Card Grid) */}
+						<div className="discovery-column">
+							<EventSearchPanel
+								onAddToItinerary={handleAddToItinerary}
+								onLocationClick={onLocationClick}
+								activeSearchQuery={searchQuery}
+							/>
+							<div className="itinerary-panel-v2">
+								<div className="itinerary-list">
+									{items.map((stop, index) => (
+										<div
+											key={stop.id}
+											className={`itinerary-item ${selectedStop === stop.id ? "selected" : ""} ${draggedIndex === index ? "dragging" : ""}`}
+											onClick={() =>
+												handleStopClick(stop)
+											}
+											draggable
+											onDragStart={() =>
+												handleDragStart(index)
+											}
+											onDragOver={(e) =>
+												handleDragOver(e, index)
+											}
+											onDragEnd={handleDragEnd}
+										>
+											{/* Drag Handle */}
+											<div
+												className="drag-handle"
+												title="Drag to reorder"
+											>
+												<span className="grip-dot"></span>
+												<span className="grip-dot"></span>
+												<span className="grip-dot"></span>
+												<span className="grip-dot"></span>
+												<span className="grip-dot"></span>
+												<span className="grip-dot"></span>
+											</div>
 
-										<div className="">
-											<span className="">
-												{stop.duration}
-											</span>
-											<span className="">
-												{stop.description}
-											</span>
-										</div>
+											{/* Item Content */}
+											<div className="item-content">
+												<span className="item-name">
+													{stop.name}
+												</span>
+												{stop.time && (
+													<span className="item-time">
+														{stop.time}
+													</span>
+												)}
+											</div>
 
-										<div className={""}>
-											{stop.sentiment === "positive"
-												? "✓ Recommended"
-												: stop.sentiment === "warning"
-													? "⚠ Check timing"
-													: "ℹ Info"}
+											{/* Remove Button */}
+											{onRemoveEvent && (
+												<button
+													className="remove-btn-v2"
+													onClick={(e) => {
+														e.stopPropagation();
+														onRemoveEvent(stop.id);
+													}}
+													title="Remove from itinerary"
+												>
+													×
+												</button>
+											)}
 										</div>
+									))}
+								</div>
+
+								{/* Footer */}
+								<div className="itinerary-footer">
+									<div className="item-count">
+										{items.length}{" "}
+										{items.length === 1
+											? "experience"
+											: "experiences"}
 									</div>
 								</div>
-							))}
-							<div className="px-6 py-5 sticky bottom-0 bg-white">
+							</div>
+						</div>
+
+						{/* Unified Search Bar */}
+						<div className="global-search-container">
+							<div className="search-wrapper">
 								<input
 									type="text"
-									className="w-full px-3.5 py-4 border rounded-lg transition-all duration-300 ease-in-out"
-									placeholder="Search locations..."
+									className="global-search-input"
+									placeholder="Ask for experiences... (e.g. 'romantic dinner' or 'jazz concert')"
 									value={searchQuery}
 									onChange={(e) =>
 										setSearchQuery(e.target.value)
 									}
+									onKeyPress={handleKeyPress}
 								/>
-							</div>
-						</div>
-						<div className="flex flex-col w-full h-full">
-							<div></div>
-						</div>
-					</div>
-				)}
-				{currentStep === 3 && (
-					<div>
-						<div className="">
-							{/* Results Column */}
-							<div className="">
-								{/* Tab Header */}
-								<div className="">
-									<button
-										className={`${activeTab === "events" ? "active" : ""}`}
-										onClick={() => setActiveTab("events")}
-									>
-										<span className="tab-icon">🎫</span>
-										Events
-									</button>
-									<button
-										className={`tab-btn ${activeTab === "restaurants" ? "active" : ""}`}
-										onClick={() =>
-											setActiveTab("restaurants")
-										}
-									>
-										<span className="tab-icon">🍽️</span>
-										Restaurants
-									</button>
-								</div>
-
-								{/* Tab Content */}
-								{activeTab === "events" ? (
-									<EventSearchPanel
-										onAddToItinerary={handleAddToItinerary}
-										onLocationClick={handleLocationClick}
-									/>
-								) : (
-									<RestaurantSearchPanel
-										onAddToItinerary={handleAddToItinerary}
-										onLocationClick={handleLocationClick}
-									/>
-								)}
-							</div>
-
-							{/* Itinerary Column */}
-							<div className="itinerary-column">
-								<div className="column-header">
-									<span className="header-icon">📋</span>
-									<h2>Itinerary</h2>
-									{customEvents.length > 0 && (
-										<span className="event-count">
-											{customEvents.length}
-										</span>
-									)}
-								</div>
-								<div className="itinerary-list">
-									{customEvents.map((event) => (
-										<div key={event.id} className="itinerary-item">
-											<div className="event-name">{event.name}</div>
-											<button 
-												onClick={() => handleRemoveFromItinerary(event.id)}
-												className="remove-btn"
-											>
-												×
-											</button>
-										</div>
-									))}
-								</div>
+								<button
+									className="global-search-btn"
+									onClick={handleSearchSubmit}
+									disabled={isSearching}
+								>
+									{isSearching ? "..." : "→"}
+								</button>
 							</div>
 						</div>
 					</div>

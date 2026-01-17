@@ -1,0 +1,255 @@
+/* Places Panel */
+.places-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #000;
+    color: #fff;
+    overflow: hidden;
+}
+
+.places-search-header {
+    padding: 16px;
+    border-bottom: 1px solid #222;
+    background: #0a0a0a;
+}
+
+.search-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.search-input {
+    flex: 1;
+    padding: 12px 16px;
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+}
+
+.search-input::placeholder {
+    color: #555;
+}
+
+.search-btn {
+    padding: 0 16px;
+    background: #222;
+    border: 1px solid #333;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 18px;
+}
+
+.search-btn:hover {
+    background: #333;
+}
+
+.filter-chips {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+
+.chip {
+    padding: 6px 16px;
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 16px;
+    color: #888;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.chip.active {
+    background: #fff;
+    color: #000;
+    border-color: #fff;
+}
+
+.places-scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.places-section {
+    margin-bottom: 24px;
+}
+
+.section-sticky-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #222;
+    position: sticky;
+    top: 0;
+    background: #000;
+    z-index: 10;
+}
+
+.section-icon {
+    font-size: 18px;
+}
+
+.section-sticky-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    flex: 1;
+}
+
+.count {
+    font-size: 11px;
+    color: #666;
+}
+
+.section-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Place Card - Matches Reference (Image Left 40%, Content Right) */
+.place-card {
+    position: relative;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: 120px;
+    background: #000;
+    border: 1px solid #222;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.place-card:hover {
+    border-color: #666;
+    transform: translateX(4px);
+}
+
+/* Image Pseudo-element */
+.place-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 40%;
+    background-image: var(--place-image);
+    background-size: cover;
+    background-position: center;
+    border-radius: 12px 0 0 12px;
+    z-index: 1;
+    transition: all 0.2s;
+}
+
+/* Shadow gradient */
+.place-card::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 40%;
+    background: linear-gradient(to right, rgba(0, 0, 0, 0) 50%, #000 100%);
+    z-index: 2;
+    pointer-events: none;
+}
+
+/* Card Info - Right Side */
+.card-info {
+    position: relative;
+    z-index: 3;
+    margin-left: 40%;
+    /* Offset */
+    padding: 12px 16px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.place-card h4 {
+    margin: 0 0 4px 0;
+    font-size: 14px;
+    color: #fff;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.meta,
+.venue,
+.category {
+    margin: 0 0 2px 0;
+    font-size: 12px;
+    color: #999;
+}
+
+.venue {
+    color: #ccc;
+}
+
+.rating {
+    color: #ffb700;
+    margin-right: 8px;
+}
+
+.price {
+    color: #4ade80;
+}
+
+/* Add Button */
+.add-btn {
+    position: relative;
+    z-index: 4;
+    width: 32px;
+    height: 32px;
+    margin-right: 12px;
+    /* Pull it slightly into the card area */
+    border-radius: 50%;
+    border: 1px solid #333;
+    background: #111;
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.add-btn:hover {
+    background: #fff;
+    color: #000;
+    border-color: #fff;
+}
+
+.add-btn.added {
+    background: #00d4aa;
+    color: #000;
+    border-color: #00d4aa;
+}
+
+.empty {
+    text-align: center;
+    color: #555;
+    padding: 20px;
+    font-size: 13px;
+}
+
+.loader {
+    text-align: center;
+    color: #666;
+    padding: 20px;
+}

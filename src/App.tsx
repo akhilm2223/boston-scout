@@ -42,8 +42,8 @@ function App() {
     name: string;
   } | null>(null);
 
+  // Itinerary State
   const [itineraryEvents, setItineraryEvents] = useState<ItineraryEvent[]>([]);
-  const [activeTab, setActiveTab] = useState<'events' | 'restaurants'>('events');
 
   const handleLocationClick = useCallback((location: [number, number], name: string) => {
     setSelectedLocation({ location, name });
@@ -63,15 +63,14 @@ function App() {
   return (
     <div className="app">
       {/* Left Panel: Results + Itinerary Side by Side */}
-    <div className="app-left-panel">
-        <ItineraryPanel 
-            dates={dates}
-            onLocationClick={handleLocationClick}
-            handleAddToItinerary={handleAddToItinerary}
-            handleRemoveFromItinerary={handleRemoveFromItinerary}
-            customEvents={itineraryEvents}
-        />
-    </div>
+      <div className="app-left-panel">
+            <ItineraryPanel
+              onLocationClick={handleLocationClick}
+              customEvents={itineraryEvents}
+                handleAddToItinerary={handleAddToItinerary}
+              onRemoveEvent={handleRemoveFromItinerary}
+            />
+      </div>
 
       {/* Right Panel: 3D Map */}
       <div className="app-right-panel">

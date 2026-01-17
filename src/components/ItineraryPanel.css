@@ -1,121 +1,164 @@
-/* Itinerary Panel - Compact Style */
-.itinerary-panel {
-  width: 100%;
-  height: 100%;
-  background: white;
+/* Itinerary Panel - Premium Design */
+.itinerary-panel-v2 {
   display: flex;
   flex-direction: column;
   height: 100%;
+  background: #050505;
+  color: #fff;
   overflow: hidden;
 }
 
-.itinerary-title {
-  font-size: 32px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-}
-
-.empty-itinerary p {
-  margin: 0;
-  font-size: 13px;
-}
-
-.empty-itinerary .empty-hint {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
-  margin-top: 6px;
-}
-
-/* Timeline Stop */
-.timeline-stop {
-  position: relative;
-  margin-bottom: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-}
-
-.timeline-stop:hover {
-  background: rgba(0, 212, 170, 0.05);
-  border-color: rgba(0, 212, 170, 0.25);
-  transform: translateX(3px);
-}
-
-.timeline-stop.selected {
-  background: rgba(0, 212, 170, 0.1);
-  border-color: rgba(0, 212, 170, 0.4);
-}
-
-.timeline-stop:hover .timeline-dot,
-.timeline-stop.selected .timeline-dot {
-  transform: scale(1.15);
-  box-shadow: 0 0 15px rgba(0, 212, 170, 0.7);
-}
-
-.timeline-icon {
-  font-size: 11px;
-}
-
-/* Stop Content */
-.timeline-content {
+/* Empty State */
+.empty-itinerary-v2 {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-
-/* Scrollbar */
-.timeline-container::-webkit-scrollbar {
-  width: 4px;
-}
-
-.timeline-container::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.timeline-container::-webkit-scrollbar-thumb {
-  background: rgba(0, 212, 170, 0.2);
-  border-radius: 2px;
-}
-
-.timeline-container::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 212, 170, 0.4);
-}
-
-/* Build Train Schedule Button */
-.build-schedule-container {
-  padding: 12px;
-  border-top: 1px solid rgba(0, 212, 170, 0.15);
-  background: linear-gradient(0deg, rgba(0, 212, 170, 0.05) 0%, transparent 100%);
-  flex-shrink: 0;
-}
-
-.build-schedule-btn {
-  width: 100%;
-  padding: 14px 16px;
-  background: linear-gradient(135deg, #00d4aa 0%, #00a888 100%);
-  border: none;
-  border-radius: 8px;
-  color: #050505;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
   align-items: center;
   justify-content: center;
+  color: rgba(255, 255, 255, 0.3);
+  gap: 12px;
+}
+
+.empty-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.empty-hint {
+  font-size: 13px;
+  color: #00d4aa;
+}
+
+/* List Container */
+.itinerary-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
-.build-schedule-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(0, 212, 170, 0.4);
+/* Itinerary Item */
+.itinerary-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
 }
 
-.build-schedule-btn:disabled {
+.itinerary-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.itinerary-item.selected {
+  background: rgba(0, 212, 170, 0.1);
+  border-color: rgba(0, 212, 170, 0.3);
+}
+
+.itinerary-item.dragging {
   opacity: 0.5;
-  cursor: not-allowed;
-  background: linear-gradient(135deg, #666 0%, #444 100%);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+}
+
+/* Drag Handle */
+.drag-handle {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2px;
+  cursor: grab;
+  padding: 4px;
+  opacity: 0.3;
+  transition: opacity 0.2s;
+}
+
+.itinerary-item:hover .drag-handle {
+  opacity: 0.8;
+}
+
+.grip-dot {
+  width: 2px;
+  height: 2px;
+  background-color: #fff;
+  border-radius: 50%;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Item Content */
+.item-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+.item-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 8px;
+}
+
+.item-time {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+}
+
+/* Remove Button */
+.remove-btn-v2 {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+  opacity: 0;
+}
+
+.itinerary-item:hover .remove-btn-v2 {
+  opacity: 1;
+}
+
+.remove-btn-v2:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ff4d4d;
+}
+
+/* Footer */
+.itinerary-footer {
+  padding: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #0a0a0a;
+}
+
+.item-count {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }

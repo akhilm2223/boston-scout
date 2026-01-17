@@ -168,7 +168,7 @@ app.get('/api/events/range', async (req, res) => {
 
 // AI-powered event search using Gemini
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 // Event categories available in the database
 const EVENT_CATEGORIES = [
@@ -230,7 +230,8 @@ Examples:
     });
 
     if (!response.ok) {
-      console.error('Gemini API error:', response.status);
+      const errorText = await response.text();
+      console.error('Gemini API error:', response.status, errorText);
       return extractKeywords(userQuery);
     }
 
