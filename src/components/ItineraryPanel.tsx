@@ -5,9 +5,13 @@ import StepOne from './StepOne';
 import StepTwo from './StepTwo';
 import { ItineraryEvent } from '../types'; 
 import EventSearchPanel from './EventSearchPanel';
+import { TripDates } from '../App';
 
-function validateStep(_step: number, _data: Record<string, unknown>): boolean {
-  // Placeholder validation logic
+function validateStep(step: number, tripDates: TripDates): boolean {
+  if (step === 1) {
+    // Require both start and end dates to be specified
+    return !!(tripDates.startDate && tripDates.endDate);
+  }
   return true;
 }
 
@@ -16,13 +20,17 @@ interface ItineraryPanelProps {
   handleAddToItinerary: (event: ItineraryEvent) => void;
   onRemoveEvent: (eventId: string) => void;
   customEvents?: ItineraryEvent[];
+  tripDates: TripDates;
+  onTripDatesChange: (dates: TripDates) => void;
 }
 
 export default function ItineraryPanel({ 
   onLocationClick, 
   handleAddToItinerary,
   onRemoveEvent,
-  customEvents = []
+  customEvents = [],
+  tripDates,
+  onTripDatesChange
 }: ItineraryPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStop, setSelectedStop] = useState<string | null>(null);
@@ -57,7 +65,7 @@ export default function ItineraryPanel({
   const totalSteps = 4;
 
   const handleNext = () => {
-    if (validateStep(currentStep, formData)) {
+    if (validateStep(currentStep, tripDates)) {
       setCurrentStep(prev => Math.min(prev + 1, totalSteps));
     }
   };
@@ -87,12 +95,26 @@ export default function ItineraryPanel({
   
   return (
 		<div className="w-full h-full bg-white flex flex-col relative overflow-hidden">
-			<div className="p-2">
+			<div className="flex flex-row space-x-5 p-2">
 				<div className="text-2xl font-bold">Your Current Itinerary</div>
+				<div>
+					<button onClick={handlePrev} disabled={currentStep === 1}>
+						Back
+					</button>
+					<button
+						onClick={handleNext}
+						disabled={currentStep === totalSteps || !validateStep(currentStep, tripDates)}
+					>
+						Next
+					</button>
+				</div>
 			</div>
 			<div className="flex overflow-auto relative flex-1">
-				{currentStep === 1 && (
-					<StepOne data={formData} onChange={setFormData} />
+			{currentStep === 1 && (
+					<StepOne 
+						data={tripDates} 
+						onChange={(newData) => onTripDatesChange(newData as TripDates)} 
+					/>
 				)}
 				{currentStep === 2 && (
 					<StepTwo data={formData} onChange={setFormData} />
@@ -106,6 +128,13 @@ export default function ItineraryPanel({
 								onLocationClick={onLocationClick}
 								activeSearchQuery={searchQuery}
 							/>
+						</div>
+
+						{/* Itinerary Column */}
+						<div className="itinerary-column">
+							<div className="column-header">
+								<h2>Your Itinerary</h2>
+							</div>
 							<div className="itinerary-panel-v2">
 								<div className="itinerary-list">
 									{items.map((stop, index) => (
@@ -177,44 +206,32 @@ export default function ItineraryPanel({
 								</div>
 							</div>
 						</div>
-
-						{/* Unified Search Bar */}
-						<div className="global-search-container">
-							<div className="search-wrapper">
-								<input
-									type="text"
-									className="global-search-input"
-									placeholder="Ask for experiences... (e.g. 'romantic dinner' or 'jazz concert')"
-									value={searchQuery}
-									onChange={(e) =>
-										setSearchQuery(e.target.value)
-									}
-									onKeyPress={handleKeyPress}
-								/>
-								<button
-									className="global-search-btn"
-									onClick={handleSearchSubmit}
-									disabled={isSearching}
-								>
-									{isSearching ? "..." : "→"}
-								</button>
-							</div>
-						</div>
 					</div>
 				)}
 			</div>
 
-			<div>
-				<button onClick={handlePrev} disabled={currentStep === 1}>
-					Back
-				</button>
-				<button
-					onClick={handleNext}
-					disabled={currentStep === totalSteps}
-				>
-					Next
-				</button>
-			</div>
+			{/* Unified Search Bar - at bottom */}
+			{currentStep === 3 && (
+				<div className="global-search-container">
+					<div className="search-wrapper">
+						<input
+							type="text"
+							className="global-search-input"
+							placeholder="Ask for experiences... (e.g. 'romantic dinner' or 'jazz concert')"
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							onKeyPress={handleKeyPress}
+						/>
+						<button
+							className="global-search-btn"
+							onClick={handleSearchSubmit}
+							disabled={isSearching}
+						>
+							{isSearching ? "..." : "→"}
+						</button>
+					</div>
+				</div>
+			)}
 		</div>
   );
 }

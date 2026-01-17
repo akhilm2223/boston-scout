@@ -18,11 +18,22 @@ export interface CitySettings {
   neonMode: boolean;
 }
 
+export interface TripDates {
+  startDate: string;
+  endDate: string;
+  specifyTimes: boolean;
+  arrivalTime: string;
+  leaveTime: string;
+}
+
 function App() {
 
-  const [dates, setDates] = useState<{ start: Date; end: Date }>({
-    start: new Date(),
-    end: new Date(),
+  const [tripDates, setTripDates] = useState<TripDates>({
+    startDate: '',
+    endDate: '',
+    specifyTimes: false,
+    arrivalTime: '00:00',
+    leaveTime: '23:59',
   });
   const [settings] = useState<CitySettings>({
     timeOfDay: 20,
@@ -67,8 +78,10 @@ function App() {
             <ItineraryPanel
               onLocationClick={handleLocationClick}
               customEvents={itineraryEvents}
-                handleAddToItinerary={handleAddToItinerary}
+              handleAddToItinerary={handleAddToItinerary}
               onRemoveEvent={handleRemoveFromItinerary}
+              tripDates={tripDates}
+              onTripDatesChange={setTripDates}
             />
       </div>
 
