@@ -1,0 +1,271 @@
+/* Restaurant Search Panel */
+.restaurant-search-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Results Area */
+.restaurant-results-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+/* Restaurants List */
+.restaurants-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.restaurant-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.restaurant-card:hover {
+    background: rgba(255, 170, 0, 0.1);
+    border-color: rgba(255, 170, 0, 0.3);
+    transform: translateX(3px);
+}
+
+.restaurant-card.added {
+    background: rgba(255, 170, 0, 0.08);
+    border-color: rgba(255, 170, 0, 0.25);
+}
+
+.restaurant-emoji {
+    width: 36px;
+    height: 36px;
+    background: rgba(255, 170, 0, 0.15);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.restaurant-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.restaurant-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0 0 4px 0;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.restaurant-meta {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.star-rating {
+    color: #ffaa00;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.rating-number {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 11px;
+    margin-left: 2px;
+}
+
+.review-count {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 10px;
+}
+
+.meta-separator {
+    opacity: 0.4;
+}
+
+.price-level {
+    color: #4ade80;
+    font-weight: 600;
+}
+
+.restaurant-category {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
+    margin: 2px 0 0 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Add Button */
+.restaurant-search-panel .add-button {
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: 2px solid rgba(255, 170, 0, 0.4);
+    border-radius: 6px;
+    color: #ffaa00;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.restaurant-search-panel .add-button:hover:not(:disabled) {
+    background: rgba(255, 170, 0, 0.2);
+    border-color: #ffaa00;
+    transform: scale(1.1);
+}
+
+.restaurant-search-panel .add-button.added {
+    background: #ffaa00;
+    border-color: #ffaa00;
+    color: #0a0a0f;
+}
+
+.restaurant-search-panel .add-button:disabled {
+    cursor: default;
+}
+
+/* Filter Toggle Button */
+.filter-toggle-btn {
+    width: 44px;
+    height: 44px;
+    background: rgba(255, 170, 0, 0.15);
+    border: 2px solid rgba(255, 170, 0, 0.3);
+    border-radius: 8px;
+    color: #ffaa00;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.filter-toggle-btn:hover {
+    background: rgba(255, 170, 0, 0.25);
+    border-color: #ffaa00;
+}
+
+/* Filters Row */
+.filters-row {
+    display: flex;
+    gap: 12px;
+    padding-top: 8px;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.filter-group label {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+    white-space: nowrap;
+}
+
+.filter-select {
+    padding: 6px 8px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 170, 0, 0.3);
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 11px;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.filter-select:focus {
+    border-color: #ffaa00;
+    box-shadow: 0 0 10px rgba(255, 170, 0, 0.2);
+}
+
+.filter-select option {
+    background: #1a1a2e;
+    color: #ffffff;
+}
+
+/* Loading State */
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 20px;
+}
+
+.loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid rgba(255, 170, 0, 0.2);
+    border-top-color: #ffaa00;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 12px;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Results Hint */
+.results-hint {
+    text-align: center;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
+    padding: 12px;
+    margin: 0;
+}
+
+/* Scrollbar */
+.restaurant-results-area::-webkit-scrollbar {
+    width: 4px;
+}
+
+.restaurant-results-area::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.restaurant-results-area::-webkit-scrollbar-thumb {
+    background: rgba(255, 170, 0, 0.2);
+    border-radius: 2px;
+}
+
+.restaurant-results-area::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 170, 0, 0.4);
+}

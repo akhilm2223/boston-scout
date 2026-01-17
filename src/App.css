@@ -90,6 +90,60 @@ body {
   margin-left: auto;
 }
 
+/* Tab Header */
+.tab-header {
+  display: flex;
+  gap: 0;
+  padding: 0;
+  background: linear-gradient(180deg, rgba(0, 212, 170, 0.08) 0%, transparent 100%);
+  border-bottom: 1px solid rgba(0, 212, 170, 0.2);
+  flex-shrink: 0;
+}
+
+.tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tab-btn:hover {
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.tab-btn.active {
+  color: #00d4aa;
+  border-bottom-color: #00d4aa;
+  background: rgba(0, 212, 170, 0.05);
+}
+
+.tab-btn:nth-child(2).active {
+  color: #ffaa00;
+  border-bottom-color: #ffaa00;
+  background: rgba(255, 170, 0, 0.05);
+}
+
+.tab-btn:nth-child(2):hover {
+  color: rgba(255, 170, 0, 0.8);
+}
+
+.tab-icon {
+  font-size: 16px;
+}
+
 /* Right Panel - Map */
 .app-right-panel {
   position: relative;

@@ -3,6 +3,7 @@ import Map3D from './components/Map3D';
 import MapErrorBoundary from './components/MapErrorBoundary';
 import ItineraryPanel from './components/ItineraryPanel';
 import EventSearchPanel, { ItineraryEvent } from './components/EventSearchPanel';
+import RestaurantSearchPanel from './components/RestaurantSearchPanel';
 import './App.css';
 
 export interface CitySettings {
@@ -38,6 +39,7 @@ function App() {
   } | null>(null);
 
   const [itineraryEvents, setItineraryEvents] = useState<ItineraryEvent[]>([]);
+  const [activeTab, setActiveTab] = useState<'events' | 'restaurants'>('events');
 
   const handleLocationClick = useCallback((location: [number, number], name: string) => {
     setSelectedLocation({ location, name });
@@ -61,14 +63,36 @@ function App() {
         <div className="dual-panel-container">
           {/* Results Column */}
           <div className="results-column">
-            <div className="column-header">
-              <span className="header-icon">🔍</span>
-              <h2>Results</h2>
+            {/* Tab Header */}
+            <div className="tab-header">
+              <button
+                className={`tab-btn ${activeTab === 'events' ? 'active' : ''}`}
+                onClick={() => setActiveTab('events')}
+              >
+                <span className="tab-icon">🎫</span>
+                Events
+              </button>
+              <button
+                className={`tab-btn ${activeTab === 'restaurants' ? 'active' : ''}`}
+                onClick={() => setActiveTab('restaurants')}
+              >
+                <span className="tab-icon">🍽️</span>
+                Restaurants
+              </button>
             </div>
-            <EventSearchPanel
-              onAddToItinerary={handleAddToItinerary}
-              onLocationClick={handleLocationClick}
-            />
+
+            {/* Tab Content */}
+            {activeTab === 'events' ? (
+              <EventSearchPanel
+                onAddToItinerary={handleAddToItinerary}
+                onLocationClick={handleLocationClick}
+              />
+            ) : (
+              <RestaurantSearchPanel
+                onAddToItinerary={handleAddToItinerary}
+                onLocationClick={handleLocationClick}
+              />
+            )}
           </div>
 
           {/* Itinerary Column */}
