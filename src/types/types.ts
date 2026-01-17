@@ -32,7 +32,22 @@ export interface Restaurant {
 	user_rating_count?: number;
 	categories?: string | string[];
 	price_level?: number;
+	phone?: string;
+	website?: string;
+	google_maps_url?: string;
+	photo_name?: string;
+	dine_in?: boolean;
+	takeout?: boolean;
+	delivery?: boolean;
+	reservable?: boolean;
+	serves_breakfast?: boolean;
+	serves_lunch?: boolean;
+	serves_dinner?: boolean;
+	serves_brunch?: boolean;
+	outdoor_seating?: boolean;
+	good_for_groups?: boolean;
 }
+
 
 export interface PlacesPanelProps {
 	onAddToItinerary: (event: ItineraryEvent) => void;

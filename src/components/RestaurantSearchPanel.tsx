@@ -1,35 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
-import { ItineraryEvent } from './EventSearchPanel';
+import { ItineraryEvent } from '../types';
 import './RestaurantSearchPanel.css';
+import { Restaurant } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-
-interface Restaurant {
-    _id: string;
-    businessname: string;
-    address: string;
-    city: string;
-    latitude: number;
-    longitude: number;
-    rating?: number;
-    user_rating_count?: number;
-    categories?: string | string[];
-    price_level?: number;
-    phone?: string;
-    website?: string;
-    google_maps_url?: string;
-    photo_name?: string;
-    dine_in?: boolean;
-    takeout?: boolean;
-    delivery?: boolean;
-    reservable?: boolean;
-    serves_breakfast?: boolean;
-    serves_lunch?: boolean;
-    serves_dinner?: boolean;
-    serves_brunch?: boolean;
-    outdoor_seating?: boolean;
-    good_for_groups?: boolean;
-}
 
 interface RestaurantSearchPanelProps {
     onAddToItinerary: (event: ItineraryEvent) => void;
