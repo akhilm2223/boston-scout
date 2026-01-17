@@ -1,5 +1,14 @@
 import { useState } from 'react';
 import './ItineraryPanel.css';
+import StepOne from './StepOne'; 
+import StepTwo from './StepTwo';
+import StepThree from './StepThree';
+import StepFour from './StepFour';
+
+function validateStep(step: number, data: Record<string, any>): boolean {
+  // Placeholder validation logic
+  return true;
+}
 
 interface ItineraryStop {
   id: string;
@@ -7,7 +16,7 @@ interface ItineraryStop {
   location: [number, number]; // [lng, lat]
   time: string;
   duration: string;
-  vibe: string;
+  description: string;
   sentiment: 'positive' | 'neutral' | 'warning';
   category: 'transit' | 'food' | 'attraction' | 'university';
 }
@@ -23,7 +32,7 @@ const ITINERARY_DATA: ItineraryStop[] = [
     location: [-71.8023, 42.2626],
     time: '9:00 AM',
     duration: '30 min',
-    vibe: 'Starting point - Worcester',
+    description: 'Starting point - Worcester',
     sentiment: 'positive',
     category: 'university',
   },
@@ -33,7 +42,7 @@ const ITINERARY_DATA: ItineraryStop[] = [
     location: [-71.4, 42.3],
     time: '9:30 AM',
     duration: '75 min',
-    vibe: 'Express to Boston - scenic route',
+    description: 'Express to Boston - scenic route',
     sentiment: 'positive',
     category: 'transit',
   },
@@ -43,7 +52,7 @@ const ITINERARY_DATA: ItineraryStop[] = [
     location: [-71.0752, 42.3478],
     time: '10:45 AM',
     duration: '10 min',
-    vibe: 'Arrival - central Boston hub',
+    description: 'Arrival - central Boston hub',
     sentiment: 'positive',
     category: 'transit',
   },
@@ -53,7 +62,7 @@ const ITINERARY_DATA: ItineraryStop[] = [
     location: [-71.0820, 42.3478],
     time: '11:00 AM',
     duration: '45 min',
-    vibe: 'Skywalk views - parent-friendly',
+    description: 'Skywalk views - parent-friendly',
     sentiment: 'positive',
     category: 'attraction',
   },
@@ -63,7 +72,7 @@ const ITINERARY_DATA: ItineraryStop[] = [
     location: [-71.0826, 42.3503],
     time: '12:00 PM',
     duration: '60 min',
-    vibe: 'Shopping & cafes - upscale vibe',
+    description: 'Shopping & cafes - upscale vibe',
     sentiment: 'positive',
     category: 'attraction',
   },
@@ -73,7 +82,7 @@ const ITINERARY_DATA: ItineraryStop[] = [
     location: [-71.0536, 42.3647],
     time: '1:30 PM',
     duration: '30 min',
-    vibe: 'Historic Italian district',
+    description: 'Historic Italian district',
     sentiment: 'positive',
     category: 'attraction',
   },
@@ -83,7 +92,7 @@ const ITINERARY_DATA: ItineraryStop[] = [
     location: [-71.0542, 42.3651],
     time: '2:00 PM',
     duration: '90 min',
-    vibe: 'Massive portions - family staple',
+    description: 'Massive portions - family staple',
     sentiment: 'positive',
     category: 'food',
   },
@@ -93,7 +102,7 @@ const ITINERARY_DATA: ItineraryStop[] = [
     location: [-71.0589, 42.3601],
     time: '4:00 PM',
     duration: '60 min',
-    vibe: 'Historic walk - accessible',
+    description: 'Historic walk - accessible',
     sentiment: 'positive',
     category: 'attraction',
   },
@@ -103,7 +112,7 @@ const ITINERARY_DATA: ItineraryStop[] = [
     location: [-71.1190, 42.3736],
     time: '5:30 PM',
     duration: '45 min',
-    vibe: 'University atmosphere - bookstores',
+    description: 'University atmosphere - bookstores',
     sentiment: 'positive',
     category: 'university',
   },
@@ -113,7 +122,7 @@ const ITINERARY_DATA: ItineraryStop[] = [
     location: [-71.8023, 42.2626],
     time: '7:00 PM',
     duration: '75 min',
-    vibe: 'Worcester Line back',
+    description: 'Worcester Line back',
     sentiment: 'neutral',
     category: 'transit',
   },
@@ -130,7 +139,7 @@ export default function ItineraryPanel({ onLocationClick }: ItineraryPanelProps)
 
   const filteredStops = ITINERARY_DATA.filter(stop =>
     stop.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    stop.vibe.toLowerCase().includes(searchQuery.toLowerCase())
+    stop.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const getCategoryIcon = (category: string) => {
@@ -143,57 +152,102 @@ export default function ItineraryPanel({ onLocationClick }: ItineraryPanelProps)
     }
   };
 
+  const [currentStep, setCurrentStep] = useState(1);
+  const [formData, setFormData] = useState({});
+  const [errors, setErrors] = useState({});
+
+  const totalSteps = 4;
+
+  const handleNext = () => {
+    if (validateStep(currentStep, formData)) {
+      setCurrentStep(prev => Math.min(prev + 1, totalSteps));
+    } else {
+      setErrors(errors => ({ ...errors, [currentStep]: 'Please fix errors before proceeding.' }));
+    }
+  };
+
+  const handlePrev = () => {
+    setCurrentStep(prev => Math.max(prev - 1, 1));
+  };
+  
   return (
-    <div className="itinerary-panel">
-      <div className="itinerary-header">
-        <h1 className="itinerary-title">MLK Weekend</h1>
-        <p className="itinerary-subtitle">WPI Parent Visit • Boston Itinerary</p>
-      </div>
+		<div className="w-full h-full bg-white flex flex-col relative overflow-hidden">
+			<div className="p-2">
+				<div className="text-2xl font-bold">Your Current Itinerary</div>
+			</div>
+			<div className="flex overflow-auto relative">
+				{currentStep === 1 && (
+					<StepOne data={formData} onChange={setFormData} />
+				)}
+				{currentStep === 2 && (
+					<StepTwo data={formData} onChange={setFormData} />
+				)}
+				{currentStep === 3 && (
+					<div className="w-full h-full flex flex-row">
+						<div className="space-y-2 p-2 flex flex-col w-full overflow-auto relative">
+							{filteredStops.map((stop, index) => (
+								<div
+									key={stop.id}
+									className={`relative cursor-pointer transition-all duration-300 ease-in-out px-4 py-5 rounded-lg border ${selectedStop === stop.id ? "selected" : ""} ${stop.sentiment}`}
+									onClick={() => handleStopClick(stop)}
+								>
+									<div className="flex flex-col gap-2">
+										<div className="">
+											<h3 className="">{stop.name}</h3>
+											<span className="">
+												{stop.time}
+											</span>
+										</div>
 
-      <div className="timeline-container">
-        <div className="timeline-line" />
-        
-        {filteredStops.map((stop, index) => (
-          <div
-            key={stop.id}
-            className={`timeline-stop ${selectedStop === stop.id ? 'selected' : ''} ${stop.sentiment}`}
-            onClick={() => handleStopClick(stop)}
-          >
-            <div className="timeline-dot">
-              <span className="timeline-icon">{getCategoryIcon(stop.category)}</span>
-            </div>
-            
-            <div className="timeline-content">
-              <div className="stop-header">
-                <h3 className="stop-name">{stop.name}</h3>
-                <span className="stop-time">{stop.time}</span>
-              </div>
-              
-              <div className="stop-details">
-                <span className="stop-duration">{stop.duration}</span>
-                <span className="stop-separator">•</span>
-                <span className="stop-vibe">{stop.vibe}</span>
-              </div>
-              
-              <div className={`sentiment-badge ${stop.sentiment}`}>
-                {stop.sentiment === 'positive' ? '✓ Recommended' : 
-                 stop.sentiment === 'warning' ? '⚠ Check timing' : 
-                 'ℹ Info'}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+										<div className="">
+											<span className="">
+												{stop.duration}
+											</span>
+											<span className="">
+												{stop.description}
+											</span>
+										</div>
 
-      <div className="search-container">
-        <input
-          type="text"
-          className="search-input"
-          placeholder="Search locations..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-      </div>
-    </div>
+										<div className={""}>
+											{stop.sentiment === "positive"
+												? "✓ Recommended"
+												: stop.sentiment === "warning"
+													? "⚠ Check timing"
+													: "ℹ Info"}
+										</div>
+									</div>
+								</div>
+							))}
+							<div className="px-6 py-5 sticky bottom-0 bg-white">
+								<input
+									type="text"
+									className="w-full px-3.5 py-4 border rounded-lg transition-all duration-300 ease-in-out"
+									placeholder="Search locations..."
+									value={searchQuery}
+									onChange={(e) =>
+										setSearchQuery(e.target.value)
+									}
+								/>
+							</div>
+						</div>
+						<div className="flex flex-col w-full h-full">
+                            <div></div>
+                        </div>
+					</div>
+				)}
+			</div>
+
+			<div>
+				<button onClick={handlePrev} disabled={currentStep === 1}>
+					Back
+				</button>
+				<button
+					onClick={handleNext}
+					disabled={currentStep === totalSteps}
+				>
+					Next
+				</button>
+			</div>
+		</div>
   );
 }

@@ -1,7 +1,7 @@
+@import "tailwindcss";
+
 * {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+  font-family: HelveticaNeue, Helvetica, Inter, Arial, sans-serif;
 }
 
 html, body, #root {
@@ -10,9 +10,8 @@ html, body, #root {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: Helvetica, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   overflow: hidden;
-  background: #050505;
 }
 
 .app {
@@ -25,16 +24,33 @@ body {
 }
 
 .app-left-panel {
-  position: relative;
-  height: 100%;
-  overflow: hidden;
-  border-right: 1px solid rgba(0, 212, 170, 0.2);
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+    border-right: 1px solid rgba(0, 212, 170, 0.2);
 }
 
 .app-right-panel {
   position: relative;
   height: 100%;
   overflow: hidden;
+}
+
+@media (max-aspect-ratio: 1/1) {
+    .app {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 1fr;
+    }
+
+    .app-left-panel {
+        border-right: none;
+        border-top: 1px solid rgba(0, 212, 170, 0.2);
+        order: 2;
+    }
+
+    .app-right-panel {
+        order: 1;
+    }
 }
 
 ::-webkit-scrollbar {
