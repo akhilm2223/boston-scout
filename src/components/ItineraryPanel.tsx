@@ -5,7 +5,7 @@ import StepOne from './StepOne';
 import StepTwo from './StepTwo';
 import { ItineraryEvent } from '../types'; 
 import EventSearchPanel from './EventSearchPanel';
-import { TripDates } from '../App';
+import { TripDates, WalkingPreferences } from '../App';
 
 function validateStep(step: number, tripDates: TripDates): boolean {
   if (step === 1) {
@@ -22,6 +22,8 @@ interface ItineraryPanelProps {
   customEvents?: ItineraryEvent[];
   tripDates: TripDates;
   onTripDatesChange: (dates: TripDates) => void;
+  walkingPreferences: WalkingPreferences;
+  onWalkingPreferencesChange: (prefs: WalkingPreferences) => void;
 }
 
 export default function ItineraryPanel({ 
@@ -30,12 +32,13 @@ export default function ItineraryPanel({
   onRemoveEvent,
   customEvents = [],
   tripDates,
-  onTripDatesChange
+  onTripDatesChange,
+  walkingPreferences,
+  onWalkingPreferencesChange
 }: ItineraryPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStop, setSelectedStop] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState({});
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [items, setItems] = useState<ItineraryEvent[]>(customEvents);
   const [isSearching, setIsSearching] = useState(false);
@@ -117,7 +120,10 @@ export default function ItineraryPanel({
 					/>
 				)}
 				{currentStep === 2 && (
-					<StepTwo data={formData} onChange={setFormData} />
+					<StepTwo 
+						data={walkingPreferences} 
+						onChange={onWalkingPreferencesChange} 
+					/>
 				)}
 				{currentStep === 3 && (
 					<div className="dual-panel-container">

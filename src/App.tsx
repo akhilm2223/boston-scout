@@ -26,6 +26,11 @@ export interface TripDates {
   leaveTime: string;
 }
 
+export interface WalkingPreferences {
+  walkingTimeMinutes: number;
+  walkingDistanceMiles: number;
+}
+
 function App() {
 
   const [tripDates, setTripDates] = useState<TripDates>({
@@ -34,6 +39,11 @@ function App() {
     specifyTimes: false,
     arrivalTime: '00:00',
     leaveTime: '23:59',
+  });
+
+  const [walkingPreferences, setWalkingPreferences] = useState<WalkingPreferences>({
+    walkingTimeMinutes: 10,
+    walkingDistanceMiles: 0.5, // 10 min * 3 mph / 60 = 0.5 miles
   });
   const [settings] = useState<CitySettings>({
     timeOfDay: 20,
@@ -82,6 +92,8 @@ function App() {
               onRemoveEvent={handleRemoveFromItinerary}
               tripDates={tripDates}
               onTripDatesChange={setTripDates}
+              walkingPreferences={walkingPreferences}
+              onWalkingPreferencesChange={setWalkingPreferences}
             />
       </div>
 
