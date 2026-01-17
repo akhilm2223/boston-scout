@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import './ItineraryPanel.css';
-import StepOne from './StepOne'; 
-import StepTwo from './StepTwo';
-import StepThree from './StepThree';
-import StepFour from './StepFour';
+import '@/components/ItineraryPanel.css';
+import StepOne from '@/components/StepOne'; 
+import StepTwo from '@/components/StepTwo';
+import EventSearchPanel, { ItineraryEvent } from '@/components/EventSearchPanel';
+import RestaurantSearchPanel from '@/components/RestaurantSearchPanel';
 
 function validateStep(step: number, data: Record<string, any>): boolean {
   // Placeholder validation logic
@@ -24,6 +24,9 @@ interface ItineraryStop {
 interface ItineraryPanelProps {
   dates: { start: Date; end: Date };
   onLocationClick: (location: [number, number], name: string) => void;
+  handleAddToItinerary: (event: ItineraryEvent) => void;
+  handleRemoveFromItinerary: (eventId: string) => void;
+  customEvents?: ItineraryEvent[];
 }
 
 const ITINERARY_DATA: ItineraryStop[] = [
@@ -129,9 +132,19 @@ const ITINERARY_DATA: ItineraryStop[] = [
   },
 ];
 
-export default function ItineraryPanel({ onLocationClick }: ItineraryPanelProps) {
+export default function ItineraryPanel({ 
+  dates, 
+  onLocationClick, 
+  handleAddToItinerary,
+  handleRemoveFromItinerary,
+  customEvents = []
+}: ItineraryPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStop, setSelectedStop] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [formData, setFormData] = useState({});
+  const [errors, setErrors] = useState({});
+  const [activeTab, setActiveTab] = useState<'events' | 'restaurants'>('events');
 
   const handleStopClick = (stop: ItineraryStop) => {
     setSelectedStop(stop.id);
@@ -152,10 +165,6 @@ export default function ItineraryPanel({ onLocationClick }: ItineraryPanelProps)
       default: return '📍';
     }
   };
-
-  const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState({});
-  const [errors, setErrors] = useState({});
 
   const totalSteps = 4;
 
@@ -232,8 +241,75 @@ export default function ItineraryPanel({ onLocationClick }: ItineraryPanelProps)
 							</div>
 						</div>
 						<div className="flex flex-col w-full h-full">
-                            <div></div>
-                        </div>
+							<div></div>
+						</div>
+					</div>
+				)}
+				{currentStep === 4 && (
+					<div>
+						<div className="dual-panel-container">
+							{/* Results Column */}
+							<div className="results-column">
+								{/* Tab Header */}
+								<div className="tab-header">
+									<button
+										className={`tab-btn ${activeTab === "events" ? "active" : ""}`}
+										onClick={() => setActiveTab("events")}
+									>
+										<span className="tab-icon">🎫</span>
+										Events
+									</button>
+									<button
+										className={`tab-btn ${activeTab === "restaurants" ? "active" : ""}`}
+										onClick={() =>
+											setActiveTab("restaurants")
+										}
+									>
+										<span className="tab-icon">🍽️</span>
+										Restaurants
+									</button>
+								</div>
+
+								{/* Tab Content */}
+								{activeTab === "events" ? (
+									<EventSearchPanel
+										onAddToItinerary={handleAddToItinerary}
+										onLocationClick={handleLocationClick}
+									/>
+								) : (
+									<RestaurantSearchPanel
+										onAddToItinerary={handleAddToItinerary}
+										onLocationClick={handleLocationClick}
+									/>
+								)}
+							</div>
+
+							{/* Itinerary Column */}
+							<div className="itinerary-column">
+								<div className="column-header">
+									<span className="header-icon">📋</span>
+									<h2>Itinerary</h2>
+									{customEvents.length > 0 && (
+										<span className="event-count">
+											{customEvents.length}
+										</span>
+									)}
+								</div>
+								<div className="itinerary-list">
+									{customEvents.map((event) => (
+										<div key={event.id} className="itinerary-item">
+											<div className="event-name">{event.name}</div>
+											<button 
+												onClick={() => handleRemoveFromItinerary(event.id)}
+												className="remove-btn"
+											>
+												×
+											</button>
+										</div>
+									))}
+								</div>
+							</div>
+						</div>
 					</div>
 				)}
 			</div>

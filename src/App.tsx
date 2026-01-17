@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import Map3D from './components/Map3D';
 import MapErrorBoundary from './components/MapErrorBoundary';
 import ItineraryPanel from './components/ItineraryPanel';
+import EventSearchPanel, { ItineraryEvent } from './components/EventSearchPanel';
+import RestaurantSearchPanel from './components/RestaurantSearchPanel';
 import './App.css';
 
 export interface CitySettings {
@@ -19,7 +21,7 @@ export interface CitySettings {
 
 function App() {
 
-  const dates = useState<{ start: Date; end: Date }>({
+  const [dates, setDates] = useState<{ start: Date; end: Date }>({
     start: new Date(),
     end: new Date(),
   });
@@ -41,16 +43,36 @@ function App() {
     name: string;
   } | null>(null);
 
+  const [itineraryEvents, setItineraryEvents] = useState<ItineraryEvent[]>([]);
+  const [activeTab, setActiveTab] = useState<'events' | 'restaurants'>('events');
+
   const handleLocationClick = useCallback((location: [number, number], name: string) => {
     setSelectedLocation({ location, name });
   }, []);
 
+  const handleAddToItinerary = useCallback((event: ItineraryEvent) => {
+    setItineraryEvents(prev => {
+      if (prev.some(e => e.id === event.id)) return prev;
+      return [...prev, event];
+    });
+  }, []);
+
+  const handleRemoveFromItinerary = useCallback((eventId: string) => {
+    setItineraryEvents(prev => prev.filter(e => e.id !== eventId));
+  }, []);
+
   return (
     <div className="app">
-      {/* Left Panel: Itinerary & Chat */}
-      <div className="app-left-panel">
-        <ItineraryPanel dates={dates} onLocationClick={handleLocationClick} />
-      </div>
+      {/* Left Panel: Results + Itinerary Side by Side */}
+    <div className="app-left-panel">
+        <ItineraryPanel 
+            dates={dates}
+            onLocationClick={handleLocationClick}
+            handleAddToItinerary={handleAddToItinerary}
+            handleRemoveFromItinerary={handleRemoveFromItinerary}
+            customEvents={itineraryEvents}
+        />
+    </div>
 
       {/* Right Panel: 3D Map */}
       <div className="app-right-panel">

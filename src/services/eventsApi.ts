@@ -1,24 +1,6 @@
 // Events API Service - MongoDB Integration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
-export interface BostonEvent {
-  _id: string;
-  id: string;
-  title: string;
-  description: string;
-  start_time: string;
-  end_time: string;
-  venue: {
-    name: string;
-    lat: number;
-    lng: number;
-  };
-  categories?: string[];
-  price?: string;
-  source?: string;
-  source_url?: string;
-}
-
 // Fetch all events from MongoDB
 export async function fetchEvents(): Promise<BostonEvent[]> {
   try {
