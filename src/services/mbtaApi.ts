@@ -78,6 +78,9 @@ export async function fetchVehicles(routeTypes?: number[]): Promise<MBTAVehicle[
     const params = new URLSearchParams({ 'api_key': MBTA_API_KEY });
     if (routeTypes && routeTypes.length > 0) {
       params.append('filter[route_type]', routeTypes.join(','));
+    } else {
+      // Default to strict filter: Light Rail, Heavy Rail, Commuter Rail only
+      params.append('filter[route_type]', '0,1,2');
     }
 
     const response = await fetch(`${MBTA_BASE_URL}/vehicles?${params}`);
@@ -231,21 +234,28 @@ function getStressColor(stress: number): string {
 // Convert vehicles to GeoJSON with occupancy stress
 export function vehiclesToGeoJSON(
   vehicles: MBTAVehicle[],
-  routes: Map<string, MBTARoute>
+  routes: Map<string, MBTARoute>,
+  validRouteIds?: Set<string>
 ): GeoJSON.FeatureCollection {
   const features: GeoJSON.Feature[] = vehicles
     .filter(v => v.latitude && v.longitude)
     .map(vehicle => {
       const route = routes.get(vehicle.routeId);
       const routeColor = route?.color || '#888888';
-      
+
+      // Smart Opacity: Check if vehicle is on a known static track
+      // User Request: "I want all trains subways" -> Disable ghost hiding. Show everything.
+      const isValid = validRouteIds ? validRouteIds.has(vehicle.routeId) : true;
+      const opacity = 1; // Always visible
+
+
       // Calculate stress from occupancy
       const stress = OCCUPANCY_STRESS[vehicle.occupancyStatus || 'NO_DATA_AVAILABLE'] || 0.2;
       const stressColor = getStressColor(stress);
-      
+
       // Speed factor (0-1, where 1 is fast ~30mph)
       const speedFactor = vehicle.speed ? Math.min(vehicle.speed / 30, 1) : 0.5;
-      
+
       // Carriage data for detailed view
       const carriageData = vehicle.carriages.map(c => ({
         label: c.label,
@@ -266,9 +276,9 @@ export function vehiclesToGeoJSON(
 
       return {
         type: 'Feature' as const,
-        geometry: { 
-          type: 'Point' as const, 
-          coordinates: [vehicle.longitude, vehicle.latitude] 
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [vehicle.longitude, vehicle.latitude]
         },
         properties: {
           id: vehicle.id,
@@ -288,7 +298,9 @@ export function vehiclesToGeoJSON(
           isMoving: vehicle.currentStatus === 'IN_TRANSIT_TO',
           vehicleType,
           isBus: vehicleType === 'bus',
+          isBus: vehicleType === 'bus',
           isRail: vehicleType !== 'bus' && vehicleType !== 'ferry',
+          opacity,
         },
       };
     });
@@ -303,13 +315,13 @@ export function calculateRouteStress(
 ): { stress: number; avgSpeed: number } {
   const routeVehicles = vehicles.filter(v => v.routeId === routeId);
   if (routeVehicles.length === 0) return { stress: 0.2, avgSpeed: 15 };
-  
+
   const totalStress = routeVehicles.reduce((sum, v) => {
     return sum + (OCCUPANCY_STRESS[v.occupancyStatus || 'NO_DATA_AVAILABLE'] || 0.2);
   }, 0);
-  
+
   const totalSpeed = routeVehicles.reduce((sum, v) => sum + (v.speed || 10), 0);
-  
+
   return {
     stress: totalStress / routeVehicles.length,
     avgSpeed: totalSpeed / routeVehicles.length,
@@ -356,7 +368,7 @@ export interface MBTAShape {
 
 export async function fetchShapes(routeIds: string[]): Promise<MBTAShape[]> {
   try {
-    const params = new URLSearchParams({ 
+    const params = new URLSearchParams({
       'api_key': MBTA_API_KEY,
       'filter[route]': routeIds.join(','),
     });
@@ -423,14 +435,14 @@ export function shapesToGeoJSON(
   });
 
   const features: GeoJSON.Feature[] = [];
-  
+
   routeShapes.forEach((shape, routeId) => {
     const route = routes.get(routeId);
     if (!route || shape.polyline.length < 2) return;
 
     // Check if route has alerts (delays)
     const hasAlert = alerts.some(a => a.routeIds.includes(routeId));
-    
+
     // Calculate stress from live vehicles
     let stress = 0.2;
     let avgSpeed = 15;
@@ -439,11 +451,11 @@ export function shapesToGeoJSON(
       stress = routeStats.stress;
       avgSpeed = routeStats.avgSpeed;
     }
-    
+
     // Stress color for the line
-    const stressColor = stress < 0.3 ? '#4ade80' : 
-                        stress < 0.5 ? '#facc15' : 
-                        stress < 0.7 ? '#fb923c' : '#ef4444';
+    const stressColor = stress < 0.3 ? '#4ade80' :
+      stress < 0.5 ? '#facc15' :
+        stress < 0.7 ? '#fb923c' : '#ef4444';
 
     features.push({
       type: 'Feature',

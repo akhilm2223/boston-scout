@@ -4,7 +4,9 @@
   box-sizing: border-box;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   width: 100%;
   height: 100%;
 }
@@ -48,4 +50,18 @@ body {
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 2px;
+}
+
+@media (max-width: 768px) {
+  .app {
+    grid-template-columns: 1fr;
+    grid-template-rows: 250px 1fr;
+    /* Itinerary on top (collapsed height), Map fills rest */
+  }
+
+  .app-left-panel {
+    border-right: none;
+    border-bottom: 1px solid rgba(0, 212, 170, 0.2);
+    overflow-y: auto;
+  }
 }

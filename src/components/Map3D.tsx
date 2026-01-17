@@ -3,10 +3,11 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { CitySettings } from '../App';
 import {
-  fetchVehicles, fetchRoutes, fetchStops, fetchAlerts, fetchShapes,
-  vehiclesToGeoJSON, stopsToGeoJSON, shapesToGeoJSON,
-  type MBTARoute, type MBTAAlert, type MBTAShape
+  fetchVehicles, fetchRoutes, fetchStops, fetchAlerts,
+  vehiclesToGeoJSON, stopsToGeoJSON,
+  type MBTARoute, type MBTAAlert
 } from '../services/mbtaApi';
+import { MBTA_STATIC_TRACKS } from '../data/mbtaStaticTracks';
 import './Map3D.css';
 
 mapboxgl.accessToken = 'pk.eyJ1IjoiYW00MzY3IiwiYSI6ImNta2djd243azA0YnMzZG82MGgzczRyaWUifQ.BSxUeP5A3krtRHdzw2n3MA';
@@ -19,59 +20,64 @@ interface Map3DProps {
 // Boston downtown center
 const BOSTON_CENTER: [number, number] = [-71.0589, 42.3601];
 
-// All tracked rail routes
-const ALL_RAIL_ROUTES = [
-  'Red', 'Orange', 'Blue', 'Green-B', 'Green-C', 'Green-D', 'Green-E', 'Mattapan',
-  'CR-Worcester', 'CR-Framingham', 'CR-Needham', 'CR-Franklin', 'CR-Providence',
-  'CR-Fairmount', 'CR-Middleborough', 'CR-Kingston', 'CR-Greenbush', 'CR-Newburyport',
-  'CR-Haverhill', 'CR-Lowell', 'CR-Fitchburg',
-];
 
-// Photorealistic AR color palette
-const AR_COLORS = {
-  // Light trail colors (like long-exposure photography)
-  fastFlow: '#e8f4ff',        // Bright white-blue (LED headlights)
-  fastFlowCore: '#ffffff',    // Pure white core
-  fastFlowGlow: '#4da6ff',    // Blue glow halo
-  slowFlow: '#ffb347',        // Warm amber (caution)
-  slowFlowCore: '#fff4e6',    // Warm white core
-  slowFlowGlow: '#ff6b35',    // Orange-red glow (brake lights)
+// Vascular Digital Twin color palette - MLK Weekend Edition
+const VASCULAR_COLORS = {
+  // Healthy flow - Electric Cyan
+  healthyCyan: '#00f3ff',
+  healthyCyanCore: '#ffffff',
+  healthyCyanGlow: '#00b8cc',
 
-  // Sentiment colors (projected light aesthetic)
-  positive: '#00d4aa',        // Teal/cyan (positive vibes)
-  negative: '#ff8c42',        // Warm amber (caution/busy)
-  neutral: '#a8c8e8',         // Soft blue-gray
+  // Delayed/stressed flow - Deep Orange/Red
+  delayCoral: '#ff3d00',
+  delayCoralCore: '#fff4e6',
+  delayCoralGlow: '#ff6b35',
 
-  // Morning atmosphere
-  hazeSky: '#b8d4e8',         // Pale morning blue
-  hazeHorizon: '#ffd4a3',     // Soft orange horizon
-  shadowTint: '#4a6080',      // Cool shadow color
+  // Sentiment colors for building underglow
+  positive: '#00f3ff',        // Cyan (parent-friendly, positive)
+  negative: '#ffb347',        // Amber (crowded, tourist-heavy)
+  neutral: '#4a6080',         // Cool gray
+
+  // Dark atmosphere
+  fogColor: '#0a0a0f',
+  horizonColor: '#1a1a2e',
+  spaceColor: '#000000',
 };
 
 // Interpolate color based on speed (fast = blue-white, slow = amber)
-function getFlowColor(speed: number, maxSpeed: number = 60): { core: string; glow: string; trail: string } {
+// Vascular flow colors based on speed and delay status
+function getVascularColor(speed: number, hasDelay: boolean = false, maxSpeed: number = 60): { core: string; glow: string; trail: string } {
+  // If route has delays, use coral/orange regardless of speed
+  if (hasDelay) {
+    return {
+      core: VASCULAR_COLORS.delayCoralCore,
+      glow: VASCULAR_COLORS.delayCoralGlow,
+      trail: VASCULAR_COLORS.delayCoral,
+    };
+  }
+
   const t = Math.min(speed / maxSpeed, 1);
 
   if (t > 0.5) {
-    // Fast: white-blue
+    // Fast: Electric Cyan (healthy flow)
     return {
-      core: AR_COLORS.fastFlowCore,
-      glow: AR_COLORS.fastFlowGlow,
-      trail: AR_COLORS.fastFlow,
+      core: VASCULAR_COLORS.healthyCyanCore,
+      glow: VASCULAR_COLORS.healthyCyanGlow,
+      trail: VASCULAR_COLORS.healthyCyan,
     };
   } else if (t > 0.2) {
-    // Medium: blend
+    // Medium: blend cyan to warm
     return {
-      core: '#fff8f0',
-      glow: '#ffa64d',
-      trail: '#ffd699',
+      core: '#e0ffff',
+      glow: '#00d4d4',
+      trail: '#00e5e5',
     };
   } else {
-    // Slow: amber-red
+    // Slow: warming towards delay colors
     return {
-      core: AR_COLORS.slowFlowCore,
-      glow: AR_COLORS.slowFlowGlow,
-      trail: AR_COLORS.slowFlow,
+      core: VASCULAR_COLORS.delayCoralCore,
+      glow: VASCULAR_COLORS.delayCoralGlow,
+      trail: VASCULAR_COLORS.delayCoral,
     };
   }
 }
@@ -91,33 +97,43 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
   const map = useRef<mapboxgl.Map | null>(null);
   const animationRef = useRef<number | null>(null);
   const mbtaIntervalRef = useRef<number | null>(null);
+
   const pulsePhaseRef = useRef(0);
   const selectedBuildingRef = useRef<string | null>(null);
+
+  // LERP State: Stores current "flight" data for every vehicle
+  // id -> { startLng, startLat, endLng, endLat, startBearing, endBearing, startTime, duration }
+  const vehicleLerpRef = useRef<Map<string, any>>(new Map());
+
 
   const [isLoaded, setIsLoaded] = useState(false);
   const [mbtaRoutes, setMbtaRoutes] = useState<Map<string, MBTARoute>>(new Map());
   const [alerts, setAlerts] = useState<MBTAAlert[]>([]);
-  const [shapes, setShapes] = useState<MBTAShape[]>([]);
-  const [systemStress, setSystemStress] = useState(0);
-  const [routeSpeeds, setRouteSpeeds] = useState<Map<string, number>>(new Map());
 
-  // Generate light trail segments with motion blur effect
+  const [systemStress, setSystemStress] = useState(0);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Generate vascular light trail segments with speed-linked pulse
   const generateLightTrails = useCallback((
     coordinates: [number, number][],
     routeColor: string,
     phase: number,
-    speed: number
+    speed: number,
+    hasDelay: boolean = false
   ): GeoJSON.Feature[] => {
     const features: GeoJSON.Feature[] = [];
     const totalPoints = coordinates.length;
     if (totalPoints < 2) return features;
 
-    // Speed affects how fast the light "moves" along the track
-    const flowSpeed = 0.2 + (speed / 60) * 0.8;
-    const adjustedPhase = (phase * flowSpeed) % 1;
+    // Speed-linked pulse: Formula from spec
+    // 60 MPH = 0.02, 10 MPH = 0.005
+    // pulseSpeed = 0.005 + (avgSpeed / 60) * 0.015
+    const flowSpeed = 0.005 + (speed / 60) * 0.015;
+    const adjustedFlowSpeed = 0.2 + flowSpeed * 40; // Scale for visual effect
+    const adjustedPhase = (phase * adjustedFlowSpeed) % 1;
 
-    // Get color based on speed
-    const colors = getFlowColor(speed);
+    // Get vascular color based on speed and delay status
+    const colors = getVascularColor(speed, hasDelay);
 
     // Create multiple light pulses traveling along the track
     const numTrails = 3;
@@ -175,52 +191,88 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
 
     const mapInstance = new mapboxgl.Map({
       container: mapContainer.current,
-      // Clean Standard style - best for 3D with custom buildings
-      style: 'mapbox://styles/mapbox/standard',
-      center: BOSTON_CENTER,
-      zoom: 14,
-      pitch: 60,
-      bearing: -17,
+      // Reverting to Dark V11 for stability (Satellite might be failing)
+      style: 'mapbox://styles/mapbox/dark-v11',
+      center: [-71.0657, 42.3550], // Boston Common (Logic Lock)
+      zoom: 13,
+      pitch: 65, // Logic Lock Pitch
+      bearing: -15, // Logic Lock Bearing
+      maxBounds: [[-71.95, 42.15], [-70.85, 42.50]], // Worcester-to-Boston Corridor
       antialias: true,
       maxPitch: 85,
     });
 
+    console.log('[Map3D] Container Dimensions:',
+      mapContainer.current.clientWidth,
+      mapContainer.current.clientHeight
+    );
+
     map.current = mapInstance;
 
     mapInstance.on('style.load', () => {
-      // ===========================================
-      // LIGHT PRESET - Clean daytime look
-      // ===========================================
+      // Load the 3D Subway Model - Absolute path from public root
+      mapInstance.addModel('subway-model', '/models/subway.glb');
 
-      // Use 'dusk' for a nice balance - not too bright, not too dark
-      mapInstance.setConfigProperty('basemap', 'lightPreset', 'dusk');
+      // Add standard lighting for 3D models (needed for simple GLB visibility)
+      if (!mapInstance.getLayer('sky')) {
+        mapInstance.addLayer({
+          id: 'sky',
+          type: 'sky',
+          paint: {
+            'sky-type': 'atmosphere',
+            'sky-atmosphere-sun': [0.0, 0.0],
+            'sky-atmosphere-sun-intensity': 15
+          }
+        });
+      }
 
-      // Hide default 3D buildings from Standard style (we use our own)
-      mapInstance.setConfigProperty('basemap', 'showPlaceLabels', true);
-      mapInstance.setConfigProperty('basemap', 'showRoadLabels', true);
-      mapInstance.setConfigProperty('basemap', 'showPointOfInterestLabels', false);
-      mapInstance.setConfigProperty('basemap', 'showTransitLabels', true);
+      // ===========================================
+      // STYLES
+      // ===========================================
+    });
+
+    mapInstance.on('style.load', () => {
+      // Load the 3D Subway Model
+      mapInstance.addModel('subway-model', './models/subway.glb');
     });
 
     mapInstance.on('load', async () => {
+
       // ===========================================
-      // ATMOSPHERIC FOG - Subtle depth
+      // MBTA VASCULAR TRACKS ("River of Light")
       // ===========================================
 
-      mapInstance.setFog({
-        range: [1, 10],
-        color: '#d8e4f0',              // Soft blue-gray
-        'high-color': '#a8c0d8',       // Lighter blue at horizon
-        'horizon-blend': 0.05,         // Subtle horizon
-        'space-color': '#e0e8f0',      // Light sky
-        'star-intensity': 0,
+      mapInstance.addSource('mbta-tracks', {
+        type: 'geojson',
+        data: MBTA_STATIC_TRACKS,
+        lineMetrics: true,
+      });
+
+      console.log('[MBTA] Static tracks loaded:', MBTA_STATIC_TRACKS.features.length, 'routes');
+
+      // GLOW ZONE - Underneath buildings
+      // Style: "Sharp Vector" (Reference Image Match)
+      mapInstance.addLayer({
+        id: 'glow-zone',
+        type: 'line',
+        source: 'mbta-tracks',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': ['get', 'color'],
+          // Precise width: 2px -> 5px
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2, 14, 3, 16, 5],
+          // Zero blur for sharp "vector" look
+          'line-blur': 0,
+          // Solid opacity
+          'line-opacity': 1.0
+        }
       });
 
       // ===========================================
       // BLACK BUILDINGS
       // ===========================================
 
-      // Try to hide default 3D buildings from Standard style
+      // Try to hide default 3D buildings
       const defaultBuildingLayers = [
         'building', 'building-extrusion', 'building-outline',
         '3d-buildings', 'building-models'
@@ -231,77 +283,35 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
         }
       });
 
+      // Add vector source for buildings
+      if (!mapInstance.getSource('buildings-source')) {
+        mapInstance.addSource('buildings-source', {
+          type: 'vector',
+          url: 'mapbox://mapbox.mapbox-streets-v8'
+        });
+      }
+
       // Our custom pure black building layer
       mapInstance.addLayer({
         id: 'buildings-3d',
-        source: 'composite',
+        source: 'buildings-source',
         'source-layer': 'building',
         filter: ['==', 'extrude', 'true'],
         type: 'fill-extrusion',
-        minzoom: 12,
+        minzoom: 14, // CULLING: Hide when zoomed out
         paint: {
-          // Pure black buildings
           'fill-extrusion-color': '#000000',
-          'fill-extrusion-height': ['get', 'height'],
-          'fill-extrusion-base': ['get', 'min_height'],
-          // Solid black
+          'fill-extrusion-height': ['coalesce', ['get', 'height'], 15],
+          'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0],
           'fill-extrusion-opacity': 0.92,
           'fill-extrusion-vertical-scale': 1.0,
+          'fill-extrusion-ambient-occlusion-intensity': 0.3,
         },
-      });
-
-      // ===========================================
-      // MBTA LIGHT TRAILS - BASE TRACKS
-      // ===========================================
-
-      mapInstance.addSource('mbta-tracks', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
       });
 
       mapInstance.addSource('mbta-trails', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
-      });
-
-      // Subtle track bed (like painted road markings)
-      mapInstance.addLayer({
-        id: 'tracks-bed',
-        type: 'line',
-        source: 'mbta-tracks',
-        paint: {
-          'line-color': 'rgba(0, 0, 0, 0.3)',
-          'line-width': 6,
-          'line-opacity': 0.4,
-        },
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-      });
-
-      // Track route color (subtle base glow)
-      mapInstance.addLayer({
-        id: 'tracks-route-glow',
-        type: 'line',
-        source: 'mbta-tracks',
-        paint: {
-          'line-color': ['get', 'color'],
-          'line-width': 12,
-          'line-blur': 8,
-          'line-opacity': 0.2,
-        },
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-      });
-
-      // Track core line
-      mapInstance.addLayer({
-        id: 'tracks-core',
-        type: 'line',
-        source: 'mbta-tracks',
-        paint: {
-          'line-color': ['get', 'color'],
-          'line-width': 2,
-          'line-opacity': 0.6,
-        },
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
       });
 
       // ===========================================
@@ -367,7 +377,7 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
         source: 'mbta-stops',
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 8, 16, 20],
-          'circle-color': AR_COLORS.positive,
+          'circle-color': VASCULAR_COLORS.positive,
           'circle-blur': 1,
           'circle-opacity': 0.3,
         },
@@ -382,7 +392,7 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 4, 16, 8],
           'circle-color': '#ffffff',
-          'circle-stroke-color': AR_COLORS.positive,
+          'circle-stroke-color': VASCULAR_COLORS.positive,
           'circle-stroke-width': 2,
         },
         minzoom: 12,
@@ -414,37 +424,89 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
         },
       });
 
-      // Vehicle glow halo (route color) - creates glowing effect around vehicles
+      // Vehicle glow halo (route color) - Restored as "Big Glow" backing for 3D model
       mapInstance.addLayer({
         id: 'vehicles-glow',
         type: 'circle',
         source: 'mbta-vehicles',
+        // Show for all (Rail + Bus) to maintain consistency
+        filter: ['!=', ['get', 'opacity'], 0],
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'],
-            12, ['case', ['get', 'isBus'], 10, 18],
-            16, ['case', ['get', 'isBus'], 22, 36]
+            10, 15,  // Large glow at city scale
+            14, 25,  // Big halo
+            16, 45   // Massive street light effect
           ],
           'circle-color': ['get', 'routeColor'],
-          'circle-blur': 0.7,
-          'circle-opacity': 0.5,
+          'circle-blur': 1.0, // Max blur for "Glow" effect
+          'circle-opacity': 0.6, // Visible but not overpowering the model
+          'circle-translate': [0, 0],
         },
       });
 
-      // ===== BUS MARKERS (Solid colored with white outline) =====
+      // ===========================================
+      // 3D MODEL LAYER - High Fidelity Trains
+      // ===========================================
+      mapInstance.addLayer({
+        id: 'mbta-subway-3d',
+        type: 'model',
+        source: 'mbta-vehicles',
+        // Show all vehicles that have opacity > 0 (Rail AND Bus)
+        filter: ['!=', ['get', 'opacity'], 0],
+        layout: {
+          'model-id': 'subway-model'
+        },
+        paint: {
+          // DYNAMIC SCALING: "Little Big" Style
+          'model-scale': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            10, ['literal', [80, 80, 80]], // Icon Mode (City View) - Boosted
+            14, ['literal', [20, 20, 20]], // Mid-range
+            16, ['literal', [9, 9, 9]],    // Approaching street
+            18, [
+              'case',
+              ['==', ['get', 'vehicleType'], 'commuter'],
+              ['literal', [3.3, 3.3, 3.3]], // Commuter Rail (+10%)
+              ['==', ['get', 'vehicleType'], 'lightrail'],
+              ['literal', [2.8, 2.8, 2.8]], // Green Line (+10%)
+              ['==', ['get', 'vehicleType'], 'bus'],
+              ['literal', [2.2, 2.2, 2.2]], // Bus (+10%)
+              ['literal', [2.8, 2.8, 2.8]]  // Standard Subway (+10%)
+            ]
+          ],
+          // REAL RUNNING: Rotate based on API bearing
+          'model-rotation': [0, 0, ['get', 'bearing']],
+
+          // REALISM RESTORED:
+          // User wants "Real" train color (textures) + Glow.
+          // Glow is handled by the 'vehicles-glow' halo layer behind this model.
+          // We remove the artificial tint to let the GLB textures show.
+
+          'model-emissive-strength': 1.0, // Ensure model is visible in dark mode
+          'model-opacity': ['get', 'opacity']
+        }
+      });
+
+
+      // ===== BUS MARKERS (Removed 2D circles, using 3D model now) =====
+      /*
       mapInstance.addLayer({
         id: 'bus-body',
         type: 'circle',
         source: 'mbta-vehicles',
         filter: ['==', ['get', 'isBus'], true],
         paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 5, 16, 11],
-          'circle-color': ['get', 'routeColor'],
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 4, 16, 8],
+          'circle-color': '#ffc72c', // MBTA Bus Yellow
           'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 12, 2, 16, 3],
+          'circle-stroke-width': 1,
+          'circle-opacity': 0.8,
         },
       });
-
-      // Bus route number label
+ 
+      // Bus route label
       mapInstance.addLayer({
         id: 'bus-label',
         type: 'symbol',
@@ -452,120 +514,25 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
         filter: ['==', ['get', 'isBus'], true],
         layout: {
           'text-field': ['get', 'label'],
-          'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+          'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
           'text-size': ['interpolate', ['linear'], ['zoom'], 12, 8, 16, 12],
-          'text-allow-overlap': true,
+          'text-allow-overlap': false,
         },
         paint: {
           'text-color': '#ffffff',
-          'text-halo-color': ['get', 'routeColor'],
+          'text-halo-color': '#000000',
           'text-halo-width': 1,
         },
         minzoom: 14,
       });
+      */
 
       // Bus direction arrow
-      mapInstance.addLayer({
-        id: 'bus-direction',
-        type: 'symbol',
-        source: 'mbta-vehicles',
-        filter: ['all', ['==', ['get', 'isBus'], true], ['==', ['get', 'isMoving'], true]],
-        layout: {
-          'icon-image': 'triangle-11',
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 16, 1],
-          'icon-rotate': ['get', 'bearing'],
-          'icon-rotation-alignment': 'map',
-          'icon-allow-overlap': true,
-          'icon-offset': [0, -12],
-        },
-        paint: {
-          'icon-color': '#ffffff',
-          'icon-opacity': 0.9,
-        },
-      });
+      // Bus direction arrow removed (replaced by 3D model)
 
-      // ===== RAIL/TRAIN MARKERS (Larger, more prominent) =====
-      // Train outer glow
-      mapInstance.addLayer({
-        id: 'train-outer-glow',
-        type: 'circle',
-        source: 'mbta-vehicles',
-        filter: ['==', ['get', 'isRail'], true],
-        paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 12, 16, 28],
-          'circle-color': ['get', 'routeColor'],
-          'circle-blur': 0.5,
-          'circle-opacity': 0.3,
-        },
-      });
+      // Train layers replaced by 3D model
+      // Keeping direction arrow for debug/clarity if needed, but model has orientation
 
-      // Train body (main marker)
-      mapInstance.addLayer({
-        id: 'train-body',
-        type: 'circle',
-        source: 'mbta-vehicles',
-        filter: ['==', ['get', 'isRail'], true],
-        paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 8, 16, 18],
-          'circle-color': ['get', 'routeColor'],
-          'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 12, 2, 16, 4],
-        },
-      });
-
-      // Train inner highlight (gives 3D effect)
-      mapInstance.addLayer({
-        id: 'train-highlight',
-        type: 'circle',
-        source: 'mbta-vehicles',
-        filter: ['==', ['get', 'isRail'], true],
-        paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 4, 16, 10],
-          'circle-color': '#ffffff',
-          'circle-opacity': 0.3,
-          'circle-translate': [-1, -1],
-        },
-      });
-
-      // Train route label
-      mapInstance.addLayer({
-        id: 'train-label',
-        type: 'symbol',
-        source: 'mbta-vehicles',
-        filter: ['==', ['get', 'isRail'], true],
-        layout: {
-          'text-field': ['get', 'label'],
-          'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
-          'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 16, 14],
-          'text-allow-overlap': true,
-        },
-        paint: {
-          'text-color': '#ffffff',
-          'text-halo-color': ['get', 'routeColor'],
-          'text-halo-width': 1.5,
-        },
-        minzoom: 13,
-      });
-
-      // Train direction arrow
-      mapInstance.addLayer({
-        id: 'train-direction',
-        type: 'symbol',
-        source: 'mbta-vehicles',
-        filter: ['all', ['==', ['get', 'isRail'], true], ['==', ['get', 'isMoving'], true]],
-        layout: {
-          'icon-image': 'triangle-11',
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 12, 0.8, 16, 1.4],
-          'icon-rotate': ['get', 'bearing'],
-          'icon-rotation-alignment': 'map',
-          'icon-allow-overlap': true,
-          'icon-offset': [0, -18],
-        },
-        paint: {
-          'icon-color': '#ffffff',
-          'icon-opacity': 0.9,
-        },
-      });
 
       // ===== FERRY MARKERS =====
       mapInstance.addLayer({
@@ -610,18 +577,68 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
         // Toggle selection
         if (selectedBuildingRef.current === buildingId) {
           selectedBuildingRef.current = null;
-          // Reset to pure black
+          // Reset to pure black and normal height
           mapInstance.setPaintProperty('buildings-3d', 'fill-extrusion-color', '#000000');
+          mapInstance.setPaintProperty('buildings-3d', 'fill-extrusion-height', ['get', 'height']);
+          mapInstance.setPaintProperty('buildings-3d', 'fill-extrusion-flood-light-intensity', 0.1);
         } else {
           selectedBuildingRef.current = buildingId;
-          // Highlight selected building with cyan color
+
+          // X-RAY LIFT: Physically lift building 50 meters
+          mapInstance.setPaintProperty('buildings-3d', 'fill-extrusion-height', [
+            'case',
+            ['==', ['id'], feature.id],
+            ['+', ['coalesce', ['get', 'height'], 30], 50], // Lift 50m
+            ['coalesce', ['get', 'height'], 30]
+          ]);
+
+          // Highlight selected building with vascular cyan
           mapInstance.setPaintProperty('buildings-3d', 'fill-extrusion-color', [
             'case',
             ['==', ['id'], feature.id],
-            '#00d4aa', // Cyan highlight
+            VASCULAR_COLORS.healthyCyan, // Electric Cyan highlight
             '#000000' // Pure black for others
           ]);
+
+          // UNDER-GLOW: Apply flood light based on sentiment
+          // For now, use cyan (positive) - can be linked to Reddit sentiment later
+          mapInstance.setPaintProperty('buildings-3d', 'fill-extrusion-flood-light-color', VASCULAR_COLORS.positive);
+          mapInstance.setPaintProperty('buildings-3d', 'fill-extrusion-flood-light-intensity', 0.6);
         }
+      });
+
+      // ===========================================
+      // VEHICLE CLICK INTERACTION - Ghost Guard
+      // ===========================================
+      // Update to listen to 3D model layer
+      mapInstance.on('click', 'mbta-subway-3d', (e) => {
+        if (!e.features || e.features.length === 0) return;
+
+        // Ghost Point Guard: Don't interact with invisible trains
+        const properties = e.features[0].properties;
+        if (properties?.opacity === 0) return;
+
+        // Perform interaction (e.g. fly to, or show popup)
+        const vehicleId = properties?.id;
+        console.log('[MBTA] Clicked vehicle:', vehicleId, 'Route:', properties?.routeId);
+
+        mapInstance.flyTo({
+          center: (e.features[0].geometry as any).coordinates,
+          zoom: 17,
+          pitch: 60,
+          essential: true
+        });
+      });
+
+      // Cursor change on vehicle hover (respecting opacity)
+      mapInstance.on('mouseenter', 'mbta-subway-3d', (e) => {
+        if (e.features && e.features[0].properties?.opacity > 0) {
+          mapInstance.getCanvas().style.cursor = 'pointer';
+        }
+      });
+
+      mapInstance.on('mouseleave', 'mbta-subway-3d', () => {
+        mapInstance.getCanvas().style.cursor = '';
       });
 
       // Cursor change on building hover
@@ -650,42 +667,169 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
     if (!isLoaded) return;
 
     const loadData = async () => {
-      const [routesData, alertsData, shapesData, stopsData] = await Promise.all([
+      if (!map.current || !map.current.getStyle()) return; // Prevent access before style load
+
+      console.log('[MBTA] Loading initial data...');
+      // Tracks are now STATIC - only fetch routes, alerts, and stops
+      const [routesData, alertsData, stopsData] = await Promise.all([
         fetchRoutes(),
         fetchAlerts(),
-        fetchShapes(ALL_RAIL_ROUTES),
         fetchStops(),
       ]);
+
+      console.log('[MBTA] Data loaded - routes:', routesData.length, 'stops:', stopsData.length, 'alerts:', alertsData.length);
 
       const routeMap = new Map(routesData.map(r => [r.id, r]));
       setMbtaRoutes(routeMap);
       setAlerts(alertsData);
-      setShapes(shapesData);
 
       if (map.current?.getSource('mbta-stops')) {
         (map.current.getSource('mbta-stops') as mapboxgl.GeoJSONSource).setData(stopsToGeoJSON(stopsData));
       }
+
+      // Static tracks are already loaded - just log confirmation
+      console.log('[MBTA] Static tracks active:', MBTA_STATIC_TRACKS.features.length, 'routes');
+
+      // Hide animated glow layers only - keep train layers visible
+      const hiddenLayers = [
+        'trails-glow', 'trails-core', 'trails-head',
+        'stops-glow', 'stops-marker',
+        'tracks-route-glow',
+        // Hide buses only, keep trains
+        'bus-body', 'bus-label', 'bus-direction',
+        'ferry-body', 'ferry-label'
+      ];
+      hiddenLayers.forEach(layer => {
+        if (map.current?.getLayer(layer)) {
+          map.current.setLayoutProperty(layer, 'visibility', 'none');
+        }
+      });
     };
 
     loadData();
   }, [isLoaded]);
 
-  // Real-time vehicle updates
+  // Real-time vehicle updates (tracks are STATIC, only vehicles are dynamic)
   useEffect(() => {
-    if (!map.current || !isLoaded || mbtaRoutes.size === 0 || shapes.length === 0) return;
+    if (!map.current || !isLoaded || mbtaRoutes.size === 0) return;
 
     const updateData = async () => {
-      const vehiclesData = await fetchVehicles();
+      // RAIL ONLY: Filter to Light Rail (0), Heavy Rail (1), Commuter Rail (2)
+      // Fetch ALL vehicle types (0-4) to ensure "all trains subways" + buses are seen
+      const vehiclesData = await fetchVehicles([0, 1, 2, 3, 4]);
 
-      // Update vehicle positions
-      const vehiclesGeoJson = vehiclesToGeoJSON(vehiclesData, mbtaRoutes);
-      const vehicleSource = map.current?.getSource('mbta-vehicles') as mapboxgl.GeoJSONSource;
-      if (vehicleSource) vehicleSource.setData(vehiclesGeoJson);
+      // MOCK WORCESTER TRAIN (Ghost Injection for Demo)
+      // If no CR-Worcester train exists, create one near WPI
+      const hasWorcester = vehiclesData.some(v => v.routeId === 'CR-Worcester');
+      if (!hasWorcester) {
+        console.log('[MBTA] Injecting Mock Worcester Train');
+        // Simulate a train moving from Worcester to Boston
+        // Use a time-based position to simulate movement along the line
+        const mockTime = Date.now() / 10000;
+        const mockProgress = (mockTime % 100) / 100; // 0 to 1 loop
 
-      // Update tracks
-      const tracksGeoJson = shapesToGeoJSON(shapes, mbtaRoutes, alerts, vehiclesData);
-      const tracksSource = map.current?.getSource('mbta-tracks') as mapboxgl.GeoJSONSource;
-      if (tracksSource) tracksSource.setData(tracksGeoJson);
+        // Approximate coordinates (Worcester -> Boston)
+        // Start: -71.798547, 42.262046 (Union Station)
+        // End: -71.055242, 42.366413 (South Station)
+        const mockLat = 42.262046 + (42.366413 - 42.262046) * mockProgress;
+        const mockLng = -71.798547 + (-71.055242 - -71.798547) * mockProgress;
+
+        vehiclesData.push({
+          id: 'mock-worcester-ghost',
+          latitude: mockLat,
+          longitude: mockLng,
+          bearing: 80, // Roughly East
+          speed: 45,
+          currentStatus: 'IN_TRANSIT_TO',
+          label: 'Ghost Train 404',
+          routeId: 'CR-Worcester',
+          directionId: 1,
+          updatedAt: new Date().toISOString(),
+          occupancyStatus: 'MANY_SEATS_AVAILABLE',
+          carriages: []
+        });
+      }
+
+      // Get valid route IDs from our static tracks
+      const staticRouteIds = new Set(
+        MBTA_STATIC_TRACKS.features.map(f => f.properties?.routeId)
+      );
+
+      // Valid routes from static tracks
+      // Passed to vehiclesToGeoJSON for opacity handling (ghost points)
+
+      console.log('[MBTA] Vehicles - total:', vehiclesData.length);
+      // Create GeoJSON, but DON'T set it yet.
+      // Update the LERP state instead.
+      const now = performance.now();
+
+      // Update LERP targets
+      const currentLerpState = vehicleLerpRef.current;
+
+      vehiclesData.forEach(v => {
+        const id = v.id;
+        const exists = currentLerpState.get(id);
+
+        if (exists) {
+          // Update existing: Old target becomes new start
+          // We calculate where it *should* be right now to avoid jumps if we are mid-animation
+          // actually, simplify: Start from current interpolated position? 
+          // For robustness, start from "previous target" (which is where we arrived)
+          // OR, if the API is slow, we might be sitting at "end" for a while.
+
+          currentLerpState.set(id, {
+            startLng: exists.endLng,
+            startLat: exists.endLat,
+            endLng: v.longitude,
+            endLat: v.latitude,
+            startBearing: exists.endBearing,
+            endBearing: v.bearing,
+            startTime: now,
+            duration: 10000 // 10s smoothing
+          });
+        } else {
+          // New vehicle: Start = End (no LERP for first frame)
+          currentLerpState.set(id, {
+            startLng: v.longitude,
+            startLat: v.latitude,
+            endLng: v.longitude,
+            endLat: v.latitude,
+            startBearing: v.bearing,
+            endBearing: v.bearing,
+            startTime: now,
+            duration: 10000
+          });
+        }
+      });
+
+      // Prune old vehicles not in new data
+      const newIds = new Set(vehiclesData.map(v => v.id));
+      for (const [key] of currentLerpState) {
+        if (!newIds.has(key)) {
+          currentLerpState.delete(key);
+        }
+      }
+
+      // Store the raw vehicles data (for properties like label, routeId etc)
+      // We'll merge LERP'd coordinates with these properties in the animation loop
+      // We can reuse the `vehiclesToGeoJSON` function but pass interpolated vehicles
+      (window as any).rawVehicleData = vehiclesData; // Store globally or in ref? Ref is better.
+      (window as any).mbtaRoutes = mbtaRoutes; // Need these for the loop
+      (window as any).staticRouteIds = staticRouteIds;
+
+      // Property Validation: Log warning for ghost vehicles (as requested for cleaning up route_ids)
+      // We can check this on the raw data immediately
+      const ghostCount = vehiclesData.filter(v => !staticRouteIds.has(v.routeId)).length;
+      if (ghostCount > 0) {
+        // Gather IDs
+        const ghosts = vehiclesData.filter(v => !staticRouteIds.has(v.routeId));
+        console.warn(`[MBTA] Found ${ghostCount} ghost vehicles. Routes:`,
+          [...new Set(ghosts.map(v => v.routeId))].join(', ')
+        );
+      }
+
+
+      // Note: Tracks are STATIC - no need to update them every poll
 
       // Calculate system stress and speed
       const stressMap: Record<string, number> = {
@@ -707,7 +851,10 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
       });
 
       setSystemStress(vehiclesData.length > 0 ? totalStress / vehiclesData.length : 0.2);
-      setRouteSpeeds(routeSpeedMap);
+
+
+      // Populate route delays from alerts (for vascular coral coloring)
+
 
     };
 
@@ -717,84 +864,81 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
     return () => {
       if (mbtaIntervalRef.current) clearInterval(mbtaIntervalRef.current);
     };
-  }, [isLoaded, mbtaRoutes, shapes, alerts]);
+  }, [isLoaded, mbtaRoutes, alerts]);
 
   // ===========================================
-  // MAIN ANIMATION LOOP - Light Trails & Building Breathing
+  // MINIMAL ANIMATION - Building Breathing Only
   // ===========================================
   useEffect(() => {
-    if (!map.current || !isLoaded || shapes.length === 0) return;
+    if (!map.current || !isLoaded) return;
 
     const animate = () => {
-      // Slower, more elegant animation for photorealistic style
-      const pulseSpeed = 0.003 + 0.008;
-      pulsePhaseRef.current = (pulsePhaseRef.current + pulseSpeed) % 1;
+      pulsePhaseRef.current = (pulsePhaseRef.current + 0.005) % 1;
       const phase = pulsePhaseRef.current;
-
-      // ===========================================
-      // GENERATE LIGHT TRAILS
-      // ===========================================
-      const trailFeatures: GeoJSON.Feature[] = [];
-
-      const routeShapes = new Map<string, MBTAShape>();
-      shapes.forEach(shape => {
-        const existing = routeShapes.get(shape.routeId);
-        if (!existing || shape.polyline.length > existing.polyline.length) {
-          routeShapes.set(shape.routeId, shape);
-        }
-      });
-
-      routeShapes.forEach((shape, routeId) => {
-        const route = mbtaRoutes.get(routeId);
-        if (!route || shape.polyline.length < 2) return;
-
-        const routeSpeed = routeSpeeds.get(routeId) || 15;
-        const trails = generateLightTrails(shape.polyline, route.color, phase, routeSpeed);
-        trailFeatures.push(...trails);
-      });
-
-      const trailSource = map.current?.getSource('mbta-trails') as mapboxgl.GeoJSONSource;
-      if (trailSource) {
-        trailSource.setData({ type: 'FeatureCollection', features: trailFeatures });
-      }
 
       // ===========================================
       // SUBTLE BUILDING BREATHING (1-2% oscillation)
       // ===========================================
-
-      // Very subtle vertical scale based on system stress
-      // More stress = slightly more "tension" in the buildings
-      const breathingIntensity = 0.01 + systemStress * 0.01; // 1-2% max
+      const breathingIntensity = 0.01 + systemStress * 0.01;
       const breathingScale = 1 + Math.sin(phase * Math.PI * 2) * breathingIntensity;
 
-      if (map.current?.getLayer('buildings-3d')) {
+      if (map.current?.getStyle() && map.current.getLayer('buildings-3d')) {
         map.current.setPaintProperty('buildings-3d', 'fill-extrusion-vertical-scale', breathingScale);
-
-        // Adjust flood light based on system stress
-        const floodColor = systemStress > 0.5
-          ? lerpColor(AR_COLORS.neutral, AR_COLORS.negative, (systemStress - 0.5) * 2)
-          : lerpColor(AR_COLORS.positive, AR_COLORS.neutral, systemStress * 2);
-
-        const floodIntensity = 0.1 + systemStress * 0.15;
-
-        map.current.setPaintProperty('buildings-3d', 'fill-extrusion-flood-light-color', floodColor);
-        map.current.setPaintProperty('buildings-3d', 'fill-extrusion-flood-light-intensity', floodIntensity);
       }
 
       // ===========================================
-      // SUBTLE TRACK GLOW ANIMATION
+      // LERP ANIMATION LOOP
       // ===========================================
-      const trackGlowOpacity = 0.15 + Math.sin(phase * Math.PI * 2) * 0.08;
-      if (map.current?.getLayer('tracks-route-glow')) {
-        map.current.setPaintProperty('tracks-route-glow', 'line-opacity', trackGlowOpacity);
+      // ===========================================
+      // LERP ANIMATION LOOP
+      // ===========================================
+      // Safety Check: Ensure map and style are fully ready
+      if (!map.current || !map.current.getStyle()) {
+        animationRef.current = requestAnimationFrame(animate);
+        return;
       }
 
-      // ===========================================
-      // STATION MARKER PULSE
-      // ===========================================
-      const stationGlow = 0.25 + Math.sin(phase * Math.PI * 3) * 0.1;
-      if (map.current?.getLayer('stops-glow')) {
-        map.current.setPaintProperty('stops-glow', 'circle-opacity', stationGlow);
+      if ((window as any).rawVehicleData && map.current.getSource('mbta-vehicles')) {
+        const now = performance.now();
+        const rawVehicles = (window as any).rawVehicleData || [];
+        const routes = (window as any).mbtaRoutes;
+        const staticIds = (window as any).staticRouteIds;
+        const lerpState = vehicleLerpRef.current;
+
+        const interpolatedVehicles = rawVehicles.map((v: any) => {
+          const state = lerpState.get(v.id);
+          if (!state) return v;
+
+          // Calculate progress (0 to 1)
+          const t = Math.min((now - state.startTime) / state.duration, 1);
+
+          // Interpolate Position
+          // Simple Linear: P = A + (B - A) * t
+          const lng = state.startLng + (state.endLng - state.startLng) * t;
+          const lat = state.startLat + (state.endLat - state.startLat) * t;
+
+          // Interpolate Bearing (Shortest path)
+          let deltaBearing = state.endBearing - state.startBearing;
+          if (deltaBearing > 180) deltaBearing -= 360;
+          if (deltaBearing < -180) deltaBearing += 360;
+          const bearing = state.startBearing + deltaBearing * t;
+
+          return {
+            ...v,
+            longitude: lng,
+            latitude: lat,
+            bearing: bearing,
+            // Keep speed same or interpolate? Keep same for now
+          };
+        });
+
+        // Convert to GeoJSON
+        // Note: calling vehiclesToGeoJSON every frame (60fps) is slightly expensive but for <100 vehicles it's negligible
+        // Ideally we shouldn't recreate properties every frame, but the 3D model needs 'bearing' prop which changes.
+        const geoJson = vehiclesToGeoJSON(interpolatedVehicles, routes, staticIds);
+
+        const source = map.current.getSource('mbta-vehicles') as mapboxgl.GeoJSONSource;
+        source.setData(geoJson);
       }
 
       animationRef.current = requestAnimationFrame(animate);
@@ -805,7 +949,7 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [isLoaded, systemStress, shapes, mbtaRoutes, routeSpeeds, generateLightTrails]);
+  }, [isLoaded, systemStress]);
 
   // Transit visibility toggle
   useEffect(() => {
@@ -818,7 +962,7 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
       // Vehicle layers
       'vehicles-shadow', 'vehicles-glow',
       'bus-body', 'bus-label', 'bus-direction',
-      'train-outer-glow', 'train-body', 'train-highlight', 'train-label', 'train-direction',
+      'mbta-subway-3d', 'vehicles-glow', // New 3D layers
       'ferry-body', 'ferry-label'
     ].forEach(layer => {
       if (map.current?.getLayer(layer)) {
@@ -851,7 +995,7 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
 
       // Temporarily increase vertical scale for dramatic effect
       map.current.setPaintProperty('buildings-3d', 'fill-extrusion-vertical-scale', 1.15);
-      
+
       // Add cyan underglow to all buildings briefly
       map.current.setPaintProperty('buildings-3d', 'fill-extrusion-flood-light-color', '#00d4aa');
       map.current.setPaintProperty('buildings-3d', 'fill-extrusion-flood-light-intensity', 0.4);
@@ -870,9 +1014,91 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
 
   }, [selectedLocation, isLoaded]);
 
+  // ===========================================
+  // EXPAND MAP TOGGLE - Cinematic Fullscreen
+  // ===========================================
+  const handleExpandToggle = useCallback(() => {
+    setIsExpanded(prev => {
+      const newExpanded = !prev;
+
+      if (map.current) {
+        if (newExpanded) {
+          // Worcester-Boston corridor view (45° pitch for better visibility)
+          map.current.easeTo({
+            center: [-71.35, 42.34], // Centered between Worcester and Boston
+            pitch: 45,  // Reduced from 75° per architect feedback
+            zoom: 10.5, // Wider to show corridor
+            bearing: 70, // Align Worcester-Boston axis vertically
+            duration: 1200,
+          });
+        } else {
+          // Return to Boston downtown view
+          map.current.easeTo({
+            center: BOSTON_CENTER,
+            pitch: 60,
+            zoom: 14,
+            bearing: -17,
+            duration: 800,
+          });
+        }
+
+        // Resize map after CSS transition
+        setTimeout(() => {
+          map.current?.resize();
+        }, 550);
+      }
+
+      return newExpanded;
+    });
+  }, []);
+
+  // Handler for "Back to WPI" - cinematic fly-to with 75° pitch
+  const handleBackToWPI = useCallback(() => {
+    if (map.current) {
+      map.current.flyTo({
+        center: [-71.798547, 42.262046], // Worcester Union Station
+        pitch: 75, // Cinematic pitch for itinerary fly-to
+        zoom: 14,
+        bearing: 45,
+        duration: 2500,
+        essential: true,
+      });
+    }
+  }, []);
+
   return (
-    <div className="map-wrapper">
+    <div className={`map-wrapper ${isExpanded ? 'expanded' : ''}`}>
       <div ref={mapContainer} className="map-container" />
+
+      {/* View Full Map Toggle Button */}
+      <button
+        className="expand-map-btn"
+        onClick={handleExpandToggle}
+        title={isExpanded ? 'Boston Downtown' : 'View Full Map'}
+      >
+        {isExpanded ? (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+          </svg>
+        ) : (
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+          </svg>
+        )}
+        <span className="btn-label">{isExpanded ? 'Downtown' : 'Full Map'}</span>
+      </button>
+
+      {/* Back to WPI Button - Always visible for parents/students */}
+      <button
+        className="back-to-wpi-btn"
+        onClick={handleBackToWPI}
+        title="Back to WPI / Worcester"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M19 12H5M12 19l-7-7 7-7" />
+        </svg>
+        <span>Back to WPI</span>
+      </button>
     </div>
   );
 }

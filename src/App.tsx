@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import Map3D from './components/Map3D';
+import MapErrorBoundary from './components/MapErrorBoundary';
 import ItineraryPanel from './components/ItineraryPanel';
 import './App.css';
 
@@ -41,14 +42,19 @@ function App() {
 
   return (
     <div className="app">
+      {/* Left Panel: Itinerary & Chat */}
       <div className="app-left-panel">
         <ItineraryPanel onLocationClick={handleLocationClick} />
       </div>
+
+      {/* Right Panel: 3D Map */}
       <div className="app-right-panel">
-        <Map3D 
-          settings={settings}
-          selectedLocation={selectedLocation}
-        />
+        <MapErrorBoundary>
+          <Map3D
+            settings={settings}
+            selectedLocation={selectedLocation}
+          />
+        </MapErrorBoundary>
       </div>
     </div>
   );
