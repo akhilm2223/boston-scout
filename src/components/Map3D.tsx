@@ -11,6 +11,7 @@ import { fetchRestaurants, restaurantsToGeoJSON } from '../services/restaurantAp
 import { fetchEvents, eventsToGeoJSON, formatEventDate, formatEventTime } from '../services/eventsApi';
 import { generateRestaurantInsightHTML } from '../services/geminiApi';
 import { MBTA_ARC_TRACKS } from '../data/mbtaArcTracks';
+import { TRAINS_ARC_TRACKS } from '../data/trainsArcTracks';
 import './Map3D.css';
 
 
@@ -27,25 +28,32 @@ const BOSTON_CENTER: [number, number] = [-71.0589, 42.3601];
 
 // Vascular Digital Twin color palette - MLK Weekend Edition
 const VASCULAR_COLORS = {
-  // Healthy flow - Electric Cyan
-  healthyCyan: '#00f3ff',
-  healthyCyanCore: '#ffffff',
-  healthyCyanGlow: '#00b8cc',
+	// Healthy flow - Electric Cyan
+	healthyCyan: "#00f3ff",
+	healthyCyanCore: "#ffffff",
+	healthyCyanGlow: "#00b8cc",
 
-  // Delayed/stressed flow - Deep Orange/Red
-  delayCoral: '#ff3d00',
-  delayCoralCore: '#fff4e6',
-  delayCoralGlow: '#ff6b35',
+	// Delayed/stressed flow - Deep Orange/Red
+	delayCoral: "#ff3d00",
+	delayCoralCore: "#fff4e6",
+	delayCoralGlow: "#ff6b35",
 
-  // Sentiment colors for building underglow
-  positive: '#00f3ff',        // Cyan (parent-friendly, positive)
-  negative: '#ffb347',        // Amber (crowded, tourist-heavy)
-  neutral: '#4a6080',         // Cool gray
+	// Sentiment colors for building underglow
+	positive: "#00f3ff", // Cyan (parent-friendly, positive)
+	negative: "#ffb347", // Amber (crowded, tourist-heavy)
+	neutral: "#4a6080", // Cool gray
 
-  // Dark atmosphere
-  fogColor: '#0a0a0f',
-  horizonColor: '#1a1a2e',
-  spaceColor: '#000000',
+	// Commuter rail colors
+	commuterRailColor: "#56236E", // Brown/dark red for commuter rail
+	commuterRailGlow: "#A0522D", // Sienna for glow
+
+	// Amtrak colors
+	amtrakColor: "#1e40af", // Deep blue for Amtrak
+
+	// Dark atmosphere
+	fogColor: "#0a0a0f",
+	horizonColor: "#1a1a2e",
+	spaceColor: "#000000",
 };
 
 // Interpolate color based on speed (fast = blue-white, slow = amber)
@@ -201,7 +209,7 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
 
     const mapInstance = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/dark-v11',
+      style: 'mapbox://styles/mapbox/light-v11',
       center: [-71.0589, 42.3601], // Boston downtown
       zoom: 14, // Better zoom to see restaurants/events (was 15)
       pitch: 60, // Reduced for better visibility (was 65)
@@ -304,8 +312,35 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
       });
 
       // ===========================================
-      // BLACK BUILDINGS
+      // COMMUTER RAIL & AMTRAK TRACKS
       // ===========================================
+
+      mapInstance.addSource('trains-tracks', {
+        type: 'geojson',
+        data: TRAINS_ARC_TRACKS,
+        lineMetrics: true,
+      });
+
+      console.log('[Trains] ARC tracks loaded:', TRAINS_ARC_TRACKS.features.length, 'arcs');
+
+      // Commuter rail main layer
+      mapInstance.addLayer({
+        id: 'trains-core',
+        type: 'line',
+        source: 'trains-tracks',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': [
+            'case',
+            ['==', ['get', 'OWNERSHIP'], 'AMTRAK'],
+            VASCULAR_COLORS.amtrakColor,    // Blue for Amtrak
+            VASCULAR_COLORS.commuterRailColor // Brown for commuter rail
+          ],
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1, 14, 1.5, 16, 2.5],
+          'line-blur': 0.2,
+          'line-opacity': 0.4
+        }
+      });
 
       // Try to hide default 3D buildings
       const defaultBuildingLayers = [
@@ -326,7 +361,7 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
         });
       }
 
-      // Our custom pure black building layer
+      // Our custom building layer - gray for light mode (default), black for dark mode
       mapInstance.addLayer({
         id: 'buildings-3d',
         source: 'buildings-source',
@@ -335,10 +370,10 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
         type: 'fill-extrusion',
         minzoom: 14, // CULLING: Hide when zoomed out
         paint: {
-          'fill-extrusion-color': '#000000',
+          'fill-extrusion-color': '#cccccc',
           'fill-extrusion-height': ['coalesce', ['get', 'height'], 15],
           'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0],
-          'fill-extrusion-opacity': 0.92,
+          'fill-extrusion-opacity': 0.4,
           'fill-extrusion-vertical-scale': 1.0,
           'fill-extrusion-ambient-occlusion-intensity': 0.3,
         },
@@ -459,7 +494,7 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
         },
       });
 
-      // Vehicle glow halo (route color) - Restored as "Big Glow" backing for 3D model
+      // Vehicle glow halo (route color)
       mapInstance.addLayer({
         id: 'vehicles-glow',
         type: 'circle',
@@ -1565,6 +1600,8 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
       'trails-glow', 'trails-core', 'trails-head',
       'stops-glow', 'stops-marker',
       'glow-zone',
+      // Commuter rail and Amtrak layers
+      'trains-core',
       // Vehicle layers
       'vehicles-shadow', 'vehicles-glow',
       'bus-body', 'bus-label', 'bus-direction',
@@ -1676,7 +1713,7 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
   useEffect(() => {
     if (!map.current || !isLoaded) return;
 
-    // Skip the first run after isLoaded becomes true - we're already on dark mode
+    // Skip the first run after isLoaded becomes true - we're already on light mode
     if (!darkModeInitializedRef.current) {
       darkModeInitializedRef.current = true;
       console.log('[Map] Dark/Light mode toggle initialized (skipping first run)');
@@ -1684,8 +1721,8 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
     }
 
     const style = isDarkMode
-      ? 'mapbox://styles/mapbox/light-v11'
-      : 'mapbox://styles/mapbox/dark-v11';
+      ? 'mapbox://styles/mapbox/dark-v11'
+      : 'mapbox://styles/mapbox/light-v11';
 
     console.log('[Map] Changing style to:', isDarkMode ? 'light' : 'dark');
     // Store current camera position
@@ -1732,10 +1769,10 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
           type: 'fill-extrusion',
           minzoom: 14,
           paint: {
-            'fill-extrusion-color': isDarkMode ? '#666666' : '#000000',
+            'fill-extrusion-color': isDarkMode ? '#000000' : '#cccccc',
             'fill-extrusion-height': ['coalesce', ['get', 'height'], 15],
             'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0],
-            'fill-extrusion-opacity': isDarkMode ? 0.7 : 0.92,
+            'fill-extrusion-opacity': isDarkMode ? 0.92 : 0.7,
             'fill-extrusion-vertical-scale': 1.0,
             'fill-extrusion-ambient-occlusion-intensity': 0.3,
           },
@@ -1865,7 +1902,7 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
               source: 'mbta-stops',
               paint: {
                 'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 8, 16, 20],
-                'circle-color': VASCULAR_COLORS.positive,
+                'circle-color': VASCULAR_COLORS.negative,
                 'circle-blur': 1,
                 'circle-opacity': 0.3,
               },
@@ -1885,6 +1922,36 @@ export default function Map3D({ settings, selectedLocation }: Map3DProps) {
                 'circle-stroke-width': 2,
               },
               minzoom: 12,
+            });
+          }
+
+          // Re-add trains tracks source and layers
+          if (!map.current.getSource('trains-tracks')) {
+            map.current.addSource('trains-tracks', {
+              type: 'geojson',
+              data: TRAINS_ARC_TRACKS,
+              lineMetrics: true,
+            });
+          }
+
+          // Re-add trains core layer
+          if (!map.current.getLayer('trains-core')) {
+            map.current.addLayer({
+              id: 'trains-core',
+              type: 'line',
+              source: 'trains-tracks',
+              layout: { 'line-cap': 'round', 'line-join': 'round' },
+              paint: {
+                'line-color': [
+                  'case',
+                  ['==', ['get', 'OWNERSHIP'], 'AMTRAK'],
+                  VASCULAR_COLORS.amtrakColor,
+                  VASCULAR_COLORS.commuterRailColor
+                ],
+                'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1, 14, 1.5, 16, 2.5],
+                'line-blur': 0.2,
+                'line-opacity': 0.4
+              }
             });
           }
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Convert MBTA shapefiles (ARC and NODE) to GeoJSON format
+Convert MBTA and Trains shapefiles (ARC and NODE) to GeoJSON format
 """
 
 import json
@@ -140,6 +140,47 @@ def main():
         f.write(";\n")
     
     print(f"✓ Converted MBTA_NODE to {node_output}")
+    
+    # Convert TRAINS_ARC (commuter rail and other train lines)
+    trains_base_path = Path(__file__).parent.parent / "public" / "trains_map_data"
+    
+    trains_arc_shp = trains_base_path / "TRAINS_ARC.shp"
+    trains_arc_geojson = convert_shapefile_to_geojson(trains_arc_shp)
+    
+    trains_arc_output = output_path / "trainsArcTracks.ts"
+    with open(trains_arc_output, 'w') as f:
+        f.write("// Auto-generated from TRAINS_ARC.shp\n")
+        f.write("export const TRAINS_ARC_TRACKS: GeoJSON.FeatureCollection = ")
+        f.write(json.dumps(trains_arc_geojson, indent=2))
+        f.write(";\n")
+    
+    print(f"✓ Converted TRAINS_ARC to {trains_arc_output}")
+    
+    # Convert TRAINS_NODE (train stations)
+    trains_node_shp = trains_base_path / "TRAINS_NODE.shp"
+    trains_node_geojson = convert_shapefile_to_geojson(trains_node_shp)
+    
+    trains_node_output = output_path / "trainsNodeStations.ts"
+    with open(trains_node_output, 'w') as f:
+        f.write("// Auto-generated from TRAINS_NODE.shp\n")
+        f.write("export const TRAINS_NODE_STATIONS: GeoJSON.FeatureCollection = ")
+        f.write(json.dumps(trains_node_geojson, indent=2))
+        f.write(";\n")
+    
+    print(f"✓ Converted TRAINS_NODE to {trains_node_output}")
+    
+    # Convert TRAINS_RTE_TRAIN (train routes)
+    trains_rte_shp = trains_base_path / "TRAINS_RTE_TRAIN.shp"
+    trains_rte_geojson = convert_shapefile_to_geojson(trains_rte_shp)
+    
+    trains_rte_output = output_path / "trainsRoutes.ts"
+    with open(trains_rte_output, 'w') as f:
+        f.write("// Auto-generated from TRAINS_RTE_TRAIN.shp\n")
+        f.write("export const TRAINS_ROUTES: GeoJSON.FeatureCollection = ")
+        f.write(json.dumps(trains_rte_geojson, indent=2))
+        f.write(";\n")
+    
+    print(f"✓ Converted TRAINS_RTE_TRAIN to {trains_rte_output}")
     
     print("\nConversion complete! Now update Map3D.tsx to use the new data sources.")
 
