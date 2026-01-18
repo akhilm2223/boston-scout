@@ -170,6 +170,15 @@ export default function ItineraryPanel({
 		}
 	}, [voiceOnboardingActive, voiceOnboarding]);
 
+	// Stop voice onboarding when reaching StepFour (final itinerary view)
+	useEffect(() => {
+		if (currentStep === 4 && voiceOnboarding.isActive) {
+			console.log("[Voice] Stopping voice onboarding - reached StepFour");
+			voiceOnboarding.stop();
+			onVoiceOnboardingComplete();
+		}
+	}, [currentStep, voiceOnboarding, onVoiceOnboardingComplete]);
+
 	// Sync items with customEvents prop
 	useEffect(() => {
 		setItems(customEvents);
