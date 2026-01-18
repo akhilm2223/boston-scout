@@ -447,20 +447,6 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         data: { type: 'FeatureCollection', features: [] },
       });
 
-      // Station glow ring
-      mapInstance.addLayer({
-        id: 'stops-glow',
-        type: 'circle',
-        source: 'mbta-stops',
-        paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 8, 16, 20],
-          'circle-color': VASCULAR_COLORS.positive,
-          'circle-blur': 1,
-          'circle-opacity': 0.3,
-        },
-        minzoom: 12,
-      });
-
       // Station core marker (MBTA style)
       mapInstance.addLayer({
         id: 'stops-marker',
@@ -1522,37 +1508,37 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       // 0=Light Rail, 1=Heavy Rail, 2=Commuter Rail, 3=Bus, 4=Ferry
       const vehiclesData = await fetchVehicles([0, 1, 2, 3, 4]);
 
-      // MOCK WORCESTER TRAIN (Ghost Injection for Demo)
-      // If no CR-Worcester train exists, create one near WPI
-      const hasWorcester = vehiclesData.some(v => v.routeId === 'CR-Worcester');
-      if (!hasWorcester) {
-        console.log('[MBTA] Injecting Mock Worcester Train');
-        // Simulate a train moving from Worcester to Boston
-        // Use a time-based position to simulate movement along the line
-        const mockTime = Date.now() / 10000;
-        const mockProgress = (mockTime % 100) / 100; // 0 to 1 loop
+      // // MOCK WORCESTER TRAIN (Ghost Injection for Demo)
+      // // If no CR-Worcester train exists, create one near WPI
+      // const hasWorcester = vehiclesData.some(v => v.routeId === 'CR-Worcester');
+      // if (!hasWorcester) {
+      //   console.log('[MBTA] Injecting Mock Worcester Train');
+      //   // Simulate a train moving from Worcester to Boston
+      //   // Use a time-based position to simulate movement along the line
+      //   const mockTime = Date.now() / 10000;
+      //   const mockProgress = (mockTime % 100) / 100; // 0 to 1 loop
 
-        // Approximate coordinates (Worcester -> Boston)
-        // Start: -71.798547, 42.262046 (Union Station)
-        // End: -71.055242, 42.366413 (South Station)
-        const mockLat = 42.262046 + (42.366413 - 42.262046) * mockProgress;
-        const mockLng = -71.798547 + (-71.055242 - -71.798547) * mockProgress;
+      //   // Approximate coordinates (Worcester -> Boston)
+      //   // Start: -71.798547, 42.262046 (Union Station)
+      //   // End: -71.055242, 42.366413 (South Station)
+      //   const mockLat = 42.262046 + (42.366413 - 42.262046) * mockProgress;
+      //   const mockLng = -71.798547 + (-71.055242 - -71.798547) * mockProgress;
 
-        vehiclesData.push({
-          id: 'mock-worcester-ghost',
-          latitude: mockLat,
-          longitude: mockLng,
-          bearing: 80, // Roughly East
-          speed: 45,
-          currentStatus: 'IN_TRANSIT_TO',
-          label: 'Ghost Train 404',
-          routeId: 'CR-Worcester',
-          directionId: 1,
-          updatedAt: new Date().toISOString(),
-          occupancyStatus: 'MANY_SEATS_AVAILABLE',
-          carriages: []
-        });
-      }
+      //   vehiclesData.push({
+      //     id: 'mock-worcester-ghost',
+      //     latitude: mockLat,
+      //     longitude: mockLng,
+      //     bearing: 80, // Roughly East
+      //     speed: 45,
+      //     currentStatus: 'IN_TRANSIT_TO',
+      //     label: 'Ghost Train 404',
+      //     routeId: 'CR-Worcester',
+      //     directionId: 1,
+      //     updatedAt: new Date().toISOString(),
+      //     occupancyStatus: 'MANY_SEATS_AVAILABLE',
+      //     carriages: []
+      //   });
+      // }
 
       // Get valid arc IDs from our MBTA arc tracks
       const staticRouteIds = new Set(
@@ -1677,18 +1663,6 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
     if (!map.current || !isLoaded) return;
 
     const animate = () => {
-      pulsePhaseRef.current = (pulsePhaseRef.current + 0.005) % 1;
-      const phase = pulsePhaseRef.current;
-
-      // ===========================================
-      // SUBTLE BUILDING BREATHING (1-2% oscillation)
-      // ===========================================
-      const breathingIntensity = 0.01 + systemStress * 0.01;
-      const breathingScale = 1 + Math.sin(phase * Math.PI * 2) * breathingIntensity;
-
-      if (map.current?.getStyle() && map.current.getLayer('buildings-3d')) {
-        map.current.setPaintProperty('buildings-3d', 'fill-extrusion-vertical-scale', breathingScale);
-      }
 
       // ===========================================
       // LERP ANIMATION LOOP
@@ -1973,316 +1947,627 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         if (!map.current) return;
 
         try {
-          // Fetch current data
-          const [stopsData, placesData, eventsData] = await Promise.all([
-            fetchStops(),
-            fetchPlaces(),
-            fetchEvents(),
-          ]);
+			// Fetch current data
+			const [stopsData, placesData, eventsData] = await Promise.all([
+				fetchStops(),
+				fetchPlaces(),
+				fetchEvents(),
+			]);
 
-          // Re-add MBTA tracks source and glow-zone layer
-          if (!map.current.getSource('mbta-tracks')) {
-            map.current.addSource('mbta-tracks', {
-              type: 'geojson',
-              data: MBTA_ARC_TRACKS,
-              lineMetrics: true,
-            });
-          }
+			// Re-add MBTA tracks source and glow-zone layer
+			if (!map.current.getSource("mbta-tracks")) {
+				map.current.addSource("mbta-tracks", {
+					type: "geojson",
+					data: MBTA_ARC_TRACKS,
+					lineMetrics: true,
+				});
+			}
 
-          // Re-add glow-zone layer if it doesn't exist
-          if (!map.current.getLayer('glow-zone')) {
-            map.current.addLayer({
-              id: 'glow-zone',
-              type: 'line',
-              source: 'mbta-tracks',
-              layout: { 'line-cap': 'round', 'line-join': 'round' },
-              paint: {
-                'line-color': [
-                  'match',
-                  ['get', 'LINE'],
-                  'RED', '#da291c',
-                  'BLUE', '#003da5',
-                  'ORANGE', '#ff7a00',
-                  'GREEN', '#00a651',
-                  'SILVER', '#7c8ca3',
-                  '#cccccc'
-                ],
-                'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2, 14, 3, 16, 5],
-                'line-blur': 0,
-                'line-opacity': 1.0
-              }
-            });
-          }
+			// Re-add glow-zone layer if it doesn't exist
+			if (!map.current.getLayer("glow-zone")) {
+				map.current.addLayer({
+					id: "glow-zone",
+					type: "line",
+					source: "mbta-tracks",
+					layout: { "line-cap": "round", "line-join": "round" },
+					paint: {
+						"line-color": [
+							"match",
+							["get", "LINE"],
+							"RED",
+							"#da291c",
+							"BLUE",
+							"#003da5",
+							"ORANGE",
+							"#ff7a00",
+							"GREEN",
+							"#00a651",
+							"SILVER",
+							"#7c8ca3",
+							"#cccccc",
+						],
+						"line-width": [
+							"interpolate",
+							["linear"],
+							["zoom"],
+							10,
+							2,
+							14,
+							3,
+							16,
+							5,
+						],
+						"line-blur": 0,
+						"line-opacity": 1.0,
+					},
+				});
+			}
 
-          // Re-add mbta-trails source if needed
-          if (!map.current.getSource('mbta-trails')) {
-            map.current.addSource('mbta-trails', {
-              type: 'geojson',
-              data: { type: 'FeatureCollection', features: [] },
-            });
-          }
+			// Re-add mbta-trails source if needed
+			if (!map.current.getSource("mbta-trails")) {
+				map.current.addSource("mbta-trails", {
+					type: "geojson",
+					data: { type: "FeatureCollection", features: [] },
+				});
+			}
 
-          // Re-add trail layers if they don't exist
-          if (!map.current.getLayer('trails-glow')) {
-            map.current.addLayer({
-              id: 'trails-glow',
-              type: 'line',
-              source: 'mbta-trails',
-              paint: {
-                'line-color': ['get', 'glowColor'],
-                'line-width': ['*', ['get', 'width'], 3],
-                'line-blur': ['get', 'blur'],
-                'line-opacity': ['*', ['get', 'intensity'], 0.4],
-              },
-              layout: { 'line-cap': 'round', 'line-join': 'round' },
-            });
-          }
+			// Re-add trail layers if they don't exist
+			if (!map.current.getLayer("trails-glow")) {
+				map.current.addLayer({
+					id: "trails-glow",
+					type: "line",
+					source: "mbta-trails",
+					paint: {
+						"line-color": ["get", "glowColor"],
+						"line-width": ["*", ["get", "width"], 3],
+						"line-blur": ["get", "blur"],
+						"line-opacity": ["*", ["get", "intensity"], 0.4],
+					},
+					layout: { "line-cap": "round", "line-join": "round" },
+				});
+			}
 
-          if (!map.current.getLayer('trails-core')) {
-            map.current.addLayer({
-              id: 'trails-core',
-              type: 'line',
-              source: 'mbta-trails',
-              paint: {
-                'line-color': ['get', 'color'],
-                'line-width': ['get', 'width'],
-                'line-blur': 0.5,
-                'line-opacity': ['get', 'intensity'],
-              },
-              layout: { 'line-cap': 'round', 'line-join': 'round' },
-            });
-          }
+			if (!map.current.getLayer("trails-core")) {
+				map.current.addLayer({
+					id: "trails-core",
+					type: "line",
+					source: "mbta-trails",
+					paint: {
+						"line-color": ["get", "color"],
+						"line-width": ["get", "width"],
+						"line-blur": 0.5,
+						"line-opacity": ["get", "intensity"],
+					},
+					layout: { "line-cap": "round", "line-join": "round" },
+				});
+			}
 
-          if (!map.current.getLayer('trails-head')) {
-            map.current.addLayer({
-              id: 'trails-head',
-              type: 'line',
-              source: 'mbta-trails',
-              filter: ['==', ['get', 'isHead'], true],
-              paint: {
-                'line-color': '#ffffff',
-                'line-width': 4,
-                'line-blur': 0,
-                'line-opacity': 0.95,
-              },
-              layout: { 'line-cap': 'round', 'line-join': 'round' },
-            });
-          }
+			if (!map.current.getLayer("trails-head")) {
+				map.current.addLayer({
+					id: "trails-head",
+					type: "line",
+					source: "mbta-trails",
+					filter: ["==", ["get", "isHead"], true],
+					paint: {
+						"line-color": "#ffffff",
+						"line-width": 4,
+						"line-blur": 0,
+						"line-opacity": 0.95,
+					},
+					layout: { "line-cap": "round", "line-join": "round" },
+				});
+			}
 
-          // Re-add stops source and layers
-          if (!map.current.getSource('mbta-stops')) {
-            map.current.addSource('mbta-stops', {
-              type: 'geojson',
-              data: { type: 'FeatureCollection', features: [] },
-            });
-          }
+			// Re-add stops source and layers
+			if (!map.current.getSource("mbta-stops")) {
+				map.current.addSource("mbta-stops", {
+					type: "geojson",
+					data: { type: "FeatureCollection", features: [] },
+				});
+			}
 
-          if (map.current.getSource('mbta-stops')) {
-            (map.current.getSource('mbta-stops') as mapboxgl.GeoJSONSource).setData(stopsToGeoJSON(stopsData));
-          }
+			if (map.current.getSource("mbta-stops")) {
+				(
+					map.current.getSource(
+						"mbta-stops",
+					) as mapboxgl.GeoJSONSource
+				).setData(stopsToGeoJSON(stopsData));
+			}
 
-          // Re-add stop layers if they don't exist
-          if (!map.current.getLayer('stops-glow')) {
-            map.current.addLayer({
-              id: 'stops-glow',
-              type: 'circle',
-              source: 'mbta-stops',
-              paint: {
-                'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 8, 16, 20],
-                'circle-color': VASCULAR_COLORS.negative,
-                'circle-blur': 1,
-                'circle-opacity': 0.3,
-              },
-              minzoom: 12,
-            });
-          }
+			// Station core marker (MBTA style)
+      if (!map.current.getLayer("stops-marker")) {
+			map.current.addLayer({
+				id: "stops-marker",
+				type: "circle",
+				source: "mbta-stops",
+				paint: {
+					"circle-radius": [
+						"interpolate",
+						["linear"],
+						["zoom"],
+						12,
+						4,
+						16,
+						8,
+					],
+					"circle-color": "#ffffff", // MBTA red
+					"circle-stroke-color": "#000000",
+					"circle-stroke-width": 1.5,
+				},
+				minzoom: 12,
+			});
+    }
 
-          if (!map.current.getLayer('stops-marker')) {
-            map.current.addLayer({
-              id: 'stops-marker',
-              type: 'circle',
-              source: 'mbta-stops',
-              paint: {
-                'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 4, 16, 8],
-                'circle-color': '#ffffff',
-                'circle-stroke-color': VASCULAR_COLORS.positive,
-                'circle-stroke-width': 2,
-              },
-              minzoom: 12,
-            });
-          }
+			// Station "T" text (MBTA logo)
+      if (!map.current.getLayer("stops-marker-text")) {
+			map.current.addLayer({
+				id: "stops-marker-text",
+				type: "symbol",
+				source: "mbta-stops",
+				layout: {
+					"text-field": "T",
+					"text-font": ["DIN Pro Bold", "Arial Unicode MS Bold"],
+					"text-size": [
+						"interpolate",
+						["linear"],
+						["zoom"],
+						12,
+						6,
+						16,
+						10,
+					],
+					"text-allow-overlap": true,
+				},
+				paint: {
+					"text-color": "#000000",
+				},
+				minzoom: 12,
+			});}
 
-          // Re-add trains tracks source and layers
-          if (!map.current.getSource('trains-tracks')) {
-            map.current.addSource('trains-tracks', {
-              type: 'geojson',
-              data: TRAINS_ARC_TRACKS,
-              lineMetrics: true,
-            });
-          }
 
-          // Re-add trains core layer
-          if (!map.current.getLayer('trains-core')) {
-            map.current.addLayer({
-              id: 'trains-core',
-              type: 'line',
-              source: 'trains-tracks',
-              layout: { 'line-cap': 'round', 'line-join': 'round' },
-              paint: {
-                'line-color': [
-                  'case',
-                  ['==', ['get', 'OWNERSHIP'], 'AMTRAK'],
-                  VASCULAR_COLORS.amtrakColor,
-                  VASCULAR_COLORS.commuterRailColor
-                ],
-                'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1, 14, 1.5, 16, 2.5],
-                'line-blur': 0.2,
-                'line-opacity': 0.4
-              }
-            });
-          }
+			// Re-add trains tracks source and layers
+			if (!map.current.getSource("trains-tracks")) {
+				map.current.addSource("trains-tracks", {
+					type: "geojson",
+					data: TRAINS_ARC_TRACKS,
+					lineMetrics: true,
+				});
+			}
 
-          // Re-add places source and layers - ONLY if places are toggled on
-          if (showPlaces) {
-            if (!map.current.getSource('places')) {
-              map.current.addSource('places', {
-                type: 'geojson',
-                data: { type: 'FeatureCollection', features: [] },
-              });
-            }
+			// Re-add trains core layer
+			if (!map.current.getLayer("trains-core")) {
+				map.current.addLayer({
+					id: "trains-core",
+					type: "line",
+					source: "trains-tracks",
+					layout: { "line-cap": "round", "line-join": "round" },
+					paint: {
+						"line-color": [
+							"case",
+							["==", ["get", "OWNERSHIP"], "AMTRAK"],
+							VASCULAR_COLORS.amtrakColor,
+							VASCULAR_COLORS.commuterRailColor,
+						],
+						"line-width": [
+							"interpolate",
+							["linear"],
+							["zoom"],
+							10,
+							1,
+							14,
+							1.5,
+							16,
+							2.5,
+						],
+						"line-blur": 0.2,
+						"line-opacity": 0.4,
+					},
+				});
+			}
 
-            if (map.current.getSource('places')) {
-              (map.current.getSource('places') as mapboxgl.GeoJSONSource).setData(placesToGeoJSON(placesData));
-            }
+			// Re-add places source and layers - ONLY if places are toggled on
+				if (!map.current.getSource("places")) {
+					map.current.addSource("places", {
+						type: "geojson",
+						data: { type: "FeatureCollection", features: [] },
+					});
+				}
 
-            // Re-add place layers if they don't exist
-            if (!map.current.getLayer('places-glow')) {
-              map.current.addLayer({
-                id: 'places-glow',
-                type: 'circle',
-                source: 'places',
-                paint: {
-                  'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 8, 14, 14, 16, 20],
-                  'circle-color': ['get', 'markerColor'],
-                  'circle-blur': 0.8,
-                  'circle-opacity': 0.6,
-                },
-                minzoom: 10,
-              });
-            }
+				if (map.current.getSource("places")) {
+					(
+						map.current.getSource(
+							"places",
+						) as mapboxgl.GeoJSONSource
+					).setData(placesToGeoJSON(placesData));
+				}
 
-            if (!map.current.getLayer('places-marker')) {
-              map.current.addLayer({
-                id: 'places-marker',
-                type: 'circle',
-                source: 'places',
-                paint: {
-                  'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 4, 14, 6, 16, 10],
-                  'circle-color': ['get', 'markerColor'],
-                  'circle-stroke-color': '#ffffff',
-                  'circle-stroke-width': 2,
-                },
-                minzoom: 10,
-              });
-            }
+				// Re-add place layers if they don't exist
+				if (!map.current.getLayer("places-glow")) {
+					map.current.addLayer({
+						id: "places-glow",
+						type: "circle",
+						source: "places",
+						paint: {
+							"circle-radius": [
+								"interpolate",
+								["linear"],
+								["zoom"],
+								10,
+								8,
+								14,
+								14,
+								16,
+								20,
+							],
+							"circle-color": ["get", "markerColor"],
+							"circle-blur": 0.8,
+							"circle-opacity": 0.6,
+						},
+						minzoom: 10,
+					});
+				}
 
-            if (!map.current.getLayer('places-label')) {
-              map.current.addLayer({
-                id: 'places-label',
-                type: 'symbol',
-                source: 'places',
-                layout: {
-                  'text-field': ['get', 'name'],
-                  'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
-                  'text-size': 11,
-                  'text-offset': [0, 1.2],
-                  'text-anchor': 'top',
-                  'text-max-width': 12,
-                },
-                paint: {
-                  'text-color': '#ffffff',
-                  'text-halo-color': '#000000',
-                  'text-halo-width': 1.5,
-                },
-                minzoom: 15,
-              });
-            }
-          }
+				if (!map.current.getLayer("places-marker")) {
+					map.current.addLayer({
+						id: "places-marker",
+						type: "circle",
+						source: "places",
+						paint: {
+							"circle-radius": [
+								"interpolate",
+								["linear"],
+								["zoom"],
+								10,
+								4,
+								14,
+								6,
+								16,
+								10,
+							],
+							"circle-color": ["get", "markerColor"],
+							"circle-stroke-color": "#ffffff",
+							"circle-stroke-width": 2,
+						},
+						minzoom: 10,
+					});
+				}
 
-          // Re-add events source and layers - ONLY if events are toggled on
-          if (showEvents) {
-            if (!map.current.getSource('events')) {
-              map.current.addSource('events', {
-                type: 'geojson',
-                data: { type: 'FeatureCollection', features: [] },
-              });
-            }
+				if (!map.current.getLayer("places-label")) {
+					map.current.addLayer({
+						id: "places-label",
+						type: "symbol",
+						source: "places",
+						layout: {
+							"text-field": ["get", "name"],
+							"text-font": [
+								"DIN Pro Medium",
+								"Arial Unicode MS Regular",
+							],
+							"text-size": 11,
+							"text-offset": [0, 1.2],
+							"text-anchor": "top",
+							"text-max-width": 12,
+						},
+						paint: {
+							"text-color": "#ffffff",
+							"text-halo-color": "#000000",
+							"text-halo-width": 1.5,
+						},
+						minzoom: 15,
+					});
+				}
 
-            if (map.current.getSource('events')) {
-              (map.current.getSource('events') as mapboxgl.GeoJSONSource).setData(eventsToGeoJSON(eventsData));
-            }
+				if (!map.current.getSource("events")) {
+					map.current.addSource("events", {
+						type: "geojson",
+						data: { type: "FeatureCollection", features: [] },
+					});
+				}
 
-            // Re-add event layers if they don't exist
-            if (!map.current.getLayer('events-glow')) {
-              map.current.addLayer({
-                id: 'events-glow',
-                type: 'circle',
-                source: 'events',
-                paint: {
-                  'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 12, 14, 18, 16, 25],
-                  'circle-color': '#e879f9',
-                  'circle-blur': 0.8,
-                  'circle-opacity': 0.7,
-                },
-                minzoom: 10,
-              });
-            }
+				if (map.current.getSource("events")) {
+					(
+						map.current.getSource(
+							"events",
+						) as mapboxgl.GeoJSONSource
+					).setData(eventsToGeoJSON(eventsData));
+				}
 
-            if (!map.current.getLayer('events-marker')) {
-              map.current.addLayer({
-                id: 'events-marker',
-                type: 'symbol',
-                source: 'events',
-                layout: {
-                  'text-field': 'E',
-                  'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
-                  'text-size': ['interpolate', ['linear'], ['zoom'], 10, 16, 14, 24, 16, 32],
-                  'text-allow-overlap': true,
-                },
-                paint: {
-                  'text-color': '#ffffff',
-                  'text-halo-color': '#a855f7',
-                  'text-halo-width': 3,
-                },
-                minzoom: 10,
-              });
-            }
+				// Re-add event layers if they don't exist
+				if (!map.current.getLayer("events-glow")) {
+					map.current.addLayer({
+						id: "events-glow",
+						type: "circle",
+						source: "events",
+						paint: {
+							"circle-radius": [
+								"interpolate",
+								["linear"],
+								["zoom"],
+								10,
+								12,
+								14,
+								18,
+								16,
+								25,
+							],
+							"circle-color": "#e879f9",
+							"circle-blur": 0.8,
+							"circle-opacity": 0.7,
+						},
+						minzoom: 10,
+					});
+				}
 
-            if (!map.current.getLayer('events-label')) {
-              map.current.addLayer({
-                id: 'events-label',
-                type: 'symbol',
-                source: 'events',
-                layout: {
-                  'text-field': ['get', 'title'],
-                  'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
-                  'text-size': 11,
-                  'text-offset': [0, 1.8],
-                  'text-anchor': 'top',
-                  'text-max-width': 12,
-                },
-                paint: {
-                  'text-color': '#ffffff',
-                  'text-halo-color': '#000000',
-                  'text-halo-width': 1.5,
-                },
-                minzoom: 14,
-              });
-            }
-          }
+				if (!map.current.getLayer("events-marker")) {
+					map.current.addLayer({
+						id: "events-marker",
+						type: "symbol",
+						source: "events",
+						layout: {
+							"text-field": "E",
+							"text-font": [
+								"DIN Pro Bold",
+								"Arial Unicode MS Bold",
+							],
+							"text-size": [
+								"interpolate",
+								["linear"],
+								["zoom"],
+								10,
+								16,
+								14,
+								24,
+								16,
+								32,
+							],
+							"text-allow-overlap": true,
+						},
+						paint: {
+							"text-color": "#ffffff",
+							"text-halo-color": "#a855f7",
+							"text-halo-width": 3,
+						},
+						minzoom: 10,
+					});
+				}
 
-          console.log('[Map] Transit and events redrawn after style change');
-        } catch (error) {
+				if (!map.current.getLayer("events-label")) {
+					map.current.addLayer({
+						id: "events-label",
+						type: "symbol",
+						source: "events",
+						layout: {
+							"text-field": ["get", "title"],
+							"text-font": [
+								"DIN Pro Medium",
+								"Arial Unicode MS Regular",
+							],
+							"text-size": 11,
+							"text-offset": [0, 1.8],
+							"text-anchor": "top",
+							"text-max-width": 12,
+						},
+						paint: {
+							"text-color": "#ffffff",
+							"text-halo-color": "#000000",
+							"text-halo-width": 1.5,
+						},
+						minzoom: 14,
+					});
+				}
+
+      // Re-add landmarks source and layers - ONLY if landmarks are toggled on
+      if (!map.current.getSource("landmarks")) {
+        map.current.addSource("landmarks", {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] },
+        });
+      }
+
+      if (map.current.getSource("landmarks")) {
+        const landmarksData = await fetchLandmarks();
+        (
+          map.current.getSource(
+            "landmarks",
+          ) as mapboxgl.GeoJSONSource
+        ).setData(landmarksToGeoJSON(landmarksData));
+      }
+
+      // Re-add landmark layers if they don't exist
+      if (!map.current.getLayer("landmarks-glow")) {
+        map.current.addLayer({
+          id: "landmarks-glow",
+          type: "circle",
+          source: "landmarks",
+          paint: {
+            "circle-radius": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              10,
+              12,
+              14,
+              18,
+              16,
+              25,
+            ],
+            "circle-color": "#a855f7",
+            "circle-blur": 0.8,
+            "circle-opacity": 0.7,
+          },
+          minzoom: 10,
+        });
+      }
+
+      if (!map.current.getLayer("landmarks-marker")) {
+        map.current.addLayer({
+          id: "landmarks-marker",
+          type: "symbol",
+          source: "landmarks",
+          layout: {
+            "text-field": "L",
+            "text-font": [
+              "DIN Pro Bold",
+              "Arial Unicode MS Bold",
+            ],
+            "text-size": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              10,
+              16,
+              14,
+              24,
+              16,
+              32,
+            ],
+            "text-allow-overlap": true,
+          },
+          paint: {
+            "text-color": "#ffffff",
+            "text-halo-color": "#8b5cf6",
+            "text-halo-width": 3,
+          },
+          minzoom: 10,
+        });
+      }
+
+      if (!map.current.getLayer("landmarks-label")) {
+        map.current.addLayer({
+          id: "landmarks-label",
+          type: "symbol",
+          source: "landmarks",
+          layout: {
+            "text-field": ["get", "name"],
+            "text-font": [
+              "DIN Pro Medium",
+              "Arial Unicode MS Regular",
+            ],
+            "text-size": 11,
+            "text-offset": [0, 1.5],
+            "text-anchor": "top",
+            "text-max-width": 12,
+          },
+          paint: {
+            "text-color": "#ffffff",
+            "text-halo-color": "#000000",
+            "text-halo-width": 1.5,
+          },
+          minzoom: 14,
+        });
+      }
+
+      map.current.addSource("mbta-vehicles", {
+			type: "geojson",
+			data: { type: "FeatureCollection", features: [] },
+		});
+
+		// Vehicle glow halo (route color)
+		map.current.addLayer({
+			id: "vehicles-glow",
+			type: "circle",
+			source: "mbta-vehicles",
+			// Show for all (Rail + Bus) to maintain consistency
+			filter: ["!=", ["get", "opacity"], 0],
+			paint: {
+				"circle-radius": [
+					"interpolate",
+					["linear"],
+					["zoom"],
+					10,
+					15, // Large glow at city scale
+					14,
+					25, // Big halo
+					16,
+					45, // Massive street light effect
+				],
+				"circle-color": ["get", "routeColor"],
+				"circle-blur": 1.0, // Max blur for "Glow" effect
+				"circle-opacity": 0.6, // Visible but not overpowering the model
+				"circle-translate": [0, 0],
+			},
+		});
+
+		// ===========================================
+		// 3D MODEL LAYER - High Fidelity Trains
+		// ===========================================
+		map.current.addLayer({
+			id: "mbta-subway-3d",
+			type: "model",
+			source: "mbta-vehicles",
+			// // Only render 3D model for trains (not buses)
+			// filter: ['all', ['!=', ['get', 'opacity'], 0], ['!=', ['get', 'vehicleType'], 'bus']],
+			layout: {
+				"model-id": "subway-model",
+			},
+			paint: {
+				// DYNAMIC SCALING: "Little Big" Style - ENLARGED
+				"model-scale": [
+					"interpolate",
+					["linear"],
+					["zoom"],
+					10,
+					["literal", [160, 160, 160]], // Icon Mode (City View) - Boosted & Enlarged
+					14,
+					["literal", [50, 50, 50]], // Mid-range - Enlarged
+					16,
+					["literal", [20, 20, 20]], // Approaching street - Enlarged
+					18,
+					[
+						"case",
+						["==", ["get", "vehicleType"], "commuter"],
+						["literal", [7.0, 7.0, 7.0]], // Commuter Rail - Enlarged
+						["==", ["get", "vehicleType"], "lightrail"],
+						["literal", [10.0, 10.0, 10.0]], // Green Line - Enlarged
+						["==", ["get", "vehicleType"], "bus"],
+						["literal", [4.5, 4.5, 4.5]], // Bus - Enlarged
+						["literal", [10.0, 10.0, 10.0]], // Standard Subway - Enlarged
+					],
+				],
+				// REAL RUNNING: Rotate based on API bearing
+				"model-rotation": [0, 0, ["get", "bearing"]],
+
+				// ROUTE COLOR TINT: Apply line color to each subway model
+				// Use routeColor directly - Mapbox should interpret hex colors
+				"model-color": ["get", "routeColor"],
+				// Control the intensity of the color blend (0 = no tint, 1 = full color)
+				"model-color-mix-intensity": 0.8,
+
+				// REALISM RESTORED:
+				// User wants "Real" train color (textures) + Glow.
+				// Glow is handled by the 'vehicles-glow' halo layer behind this model.
+				// Route color tint makes the model match the line color.
+
+				"model-emissive-strength": 0.0, // No emissive glow - rely on halo layer for brightness
+				"model-opacity": ["get", "opacity"],
+			},
+		});
+
+      // Set visibility based on toggle state
+      const placesVis = showPlaces ? 'visible' : 'none';
+      const eventsVis = showEvents ? 'visible' : 'none';
+      const landmarksVis = showLandmarks ? 'visible' : 'none';
+
+      ['places-glow', 'places-marker', 'places-label'].forEach(layer => {
+        if (map.current?.getLayer(layer)) {
+          map.current.setLayoutProperty(layer, 'visibility', placesVis);
+        }
+      });
+
+      ['events-glow', 'events-marker', 'events-label'].forEach(layer => {
+        if (map.current?.getLayer(layer)) {
+          map.current.setLayoutProperty(layer, 'visibility', eventsVis);
+        }
+      });
+
+      ['landmarks-glow', 'landmarks-marker', 'landmarks-label'].forEach(layer => {
+        if (map.current?.getLayer(layer)) {
+          map.current.setLayoutProperty(layer, 'visibility', landmarksVis);
+        }
+      });
+
+			console.log("[Map] Transit and events redrawn after style change");
+		} catch (error) {
           console.error('[Map] Error redrawing transit and events:', error);
         }
       };
