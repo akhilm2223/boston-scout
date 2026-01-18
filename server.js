@@ -388,6 +388,594 @@ app.get('/api/events/categories', async (req, res) => {
   }
 });
 
+// ============================================
+// VECTOR SEARCH ENDPOINTS
+// ============================================
+
+const GEMINI_EMBEDDING_URL = 'https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent';
+
+// Cache for query embeddings
+const embeddingCache = new Map();
+
+/**
+ * Get embedding for a query string using Gemini
+ */
+async function getQueryEmbedding(query) {
+  // Check cache first
+  if (embeddingCache.has(query)) {
+    return embeddingCache.get(query);
+  }
+
+  try {
+    const response = await fetch(`${GEMINI_EMBEDDING_URL}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'models/text-embedding-004',
+        content: {
+          parts: [{ text: query }]
+        }
+      })
+    });
+
+    if (!response.ok) {
+      console.error('Embedding API error:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    const embedding = data.embedding?.values || null;
+
+    // Cache the result
+    if (embedding) {
+      embeddingCache.set(query, embedding);
+      // Limit cache size
+      if (embeddingCache.size > 1000) {
+        const firstKey = embeddingCache.keys().next().value;
+        embeddingCache.delete(firstKey);
+      }
+    }
+
+    return embedding;
+  } catch (error) {
+    console.error('Embedding error:', error);
+    return null;
+  }
+}
+
+/**
+ * POST /api/places/vibe-search
+ * Semantic vector search for places
+ */
+app.post('/api/places/vibe-search', async (req, res) => {
+  const startTime = Date.now();
+
+  try {
+    const { query, limit = 10, filters = {} } = req.body;
+
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    // Get embedding for the query
+    const queryEmbedding = await getQueryEmbedding(query);
+
+    let results;
+
+    if (queryEmbedding) {
+      // Use vector search if embedding is available
+      const pipeline = [
+        {
+          $vectorSearch: {
+            index: 'vibe_index',
+            path: 'embedding',
+            queryVector: queryEmbedding,
+            numCandidates: 100,
+            limit: limit
+          }
+        },
+        {
+          $addFields: {
+            score: { $meta: 'vectorSearchScore' }
+          }
+        }
+      ];
+
+      // Add filters if provided
+      if (filters.categories && filters.categories.length > 0) {
+        pipeline.push({
+          $match: {
+            categories: { $regex: filters.categories.join('|'), $options: 'i' }
+          }
+        });
+      }
+
+      if (filters.minRating) {
+        pipeline.push({
+          $match: { rating: { $gte: filters.minRating } }
+        });
+      }
+
+      if (filters.maxPriceLevel) {
+        pipeline.push({
+          $match: { price_level: { $lte: filters.maxPriceLevel } }
+        });
+      }
+
+      // Project only needed fields
+      pipeline.push({
+        $project: {
+          embedding: 0 // Exclude large embedding array from response
+        }
+      });
+
+      results = await placesCollection.aggregate(pipeline).toArray();
+    } else {
+      // Fallback to text search if embedding fails
+      console.log('Falling back to text search for:', query);
+      const searchTerms = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+      const regexPattern = searchTerms.join('|');
+
+      results = await placesCollection
+        .find({
+          $or: [
+            { businessname: { $regex: regexPattern, $options: 'i' } },
+            { categories: { $regex: regexPattern, $options: 'i' } }
+          ]
+        })
+        .limit(limit)
+        .project({ embedding: 0 })
+        .toArray();
+    }
+
+    const took_ms = Date.now() - startTime;
+
+    res.json({
+      results,
+      query,
+      count: results.length,
+      took_ms
+    });
+
+  } catch (error) {
+    console.error('Vibe search error:', error);
+    res.status(500).json({ error: 'Failed to search places' });
+  }
+});
+
+/**
+ * GET /api/places/hero
+ * Get hero options based on transit speed and time of day
+ */
+app.get('/api/places/hero', async (req, res) => {
+  try {
+    const { query, transitSpeed = 50 } = req.query;
+    const hour = new Date().getHours();
+    const speed = parseInt(transitSpeed);
+
+    // Determine city pulse
+    let cityPulse;
+    if (speed < 25) cityPulse = 'slow';
+    else if (speed < 50) cityPulse = 'moderate';
+    else if (speed < 75) cityPulse = 'active';
+    else cityPulse = 'busy';
+
+    // Determine time-based options
+    let timeContext;
+    if (hour >= 6 && hour < 11) timeContext = 'morning';
+    else if (hour >= 11 && hour < 14) timeContext = 'lunch';
+    else if (hour >= 14 && hour < 17) timeContext = 'afternoon';
+    else if (hour >= 17 && hour < 21) timeContext = 'dinner';
+    else timeContext = 'night';
+
+    // Generate options based on context
+    const optionSets = {
+      morning: [
+        { id: 'coffee', emoji: '☕', label: 'Coffee', query: 'coffee cafe morning breakfast' },
+        { id: 'brunch', emoji: '🥞', label: 'Brunch', query: 'brunch breakfast eggs' },
+        { id: 'bakery', emoji: '🥐', label: 'Bakery', query: 'bakery pastry fresh' },
+        { id: 'parks', emoji: '🌳', label: 'Parks', query: 'park outdoor morning walk' }
+      ],
+      lunch: [
+        { id: 'quick', emoji: '🥪', label: 'Quick Bite', query: 'lunch quick sandwich fast casual' },
+        { id: 'healthy', emoji: '🥗', label: 'Healthy', query: 'salad healthy lunch light' },
+        { id: 'asian', emoji: '🍜', label: 'Asian', query: 'asian noodles ramen pho' },
+        { id: 'deli', emoji: '🥓', label: 'Deli', query: 'deli sandwich sub lunch' }
+      ],
+      afternoon: [
+        { id: 'coffee', emoji: '☕', label: 'Coffee', query: 'coffee afternoon cafe' },
+        { id: 'dessert', emoji: '🍰', label: 'Dessert', query: 'dessert sweet bakery ice cream' },
+        { id: 'happy', emoji: '🍺', label: 'Happy Hour', query: 'bar happy hour drinks' },
+        { id: 'museum', emoji: '🏛️', label: 'Museums', query: 'museum gallery art culture' }
+      ],
+      dinner: [
+        { id: 'italian', emoji: '🍝', label: 'Italian', query: 'italian pasta dinner romantic' },
+        { id: 'seafood', emoji: '🦞', label: 'Seafood', query: 'seafood lobster oyster boston' },
+        { id: 'steakhouse', emoji: '🥩', label: 'Steakhouse', query: 'steak steakhouse dinner upscale' },
+        { id: 'datenight', emoji: '🕯️', label: 'Date Night', query: 'romantic dinner date cozy' }
+      ],
+      night: [
+        { id: 'bars', emoji: '🍸', label: 'Bars', query: 'bar cocktails nightlife drinks' },
+        { id: 'live', emoji: '🎵', label: 'Live Music', query: 'live music concert jazz' },
+        { id: 'club', emoji: '🪩', label: 'Clubs', query: 'club dance nightclub party' },
+        { id: 'latenight', emoji: '🌙', label: 'Late Night', query: 'late night food open late' }
+      ]
+    };
+
+    let options = [...optionSets[timeContext]];
+
+    // Adjust based on pulse
+    if (cityPulse === 'busy') {
+      options[0] = { id: 'trending', emoji: '🔥', label: 'Trending', query: 'popular trending busy crowded' };
+    } else if (cityPulse === 'slow') {
+      options[3] = { id: 'quiet', emoji: '🤫', label: 'Quiet Spots', query: 'quiet peaceful relaxed hidden gem' };
+    }
+
+    res.json({
+      options,
+      transitSpeed: speed,
+      cityPulse,
+      timeContext
+    });
+
+  } catch (error) {
+    console.error('Hero options error:', error);
+    res.status(500).json({ error: 'Failed to get hero options' });
+  }
+});
+
+/**
+ * GET /api/places/infinite
+ * Cursor-based pagination for virtual scrolling
+ */
+app.get('/api/places/infinite', async (req, res) => {
+  try {
+    const { cursor, limit = 10, query } = req.query;
+    const limitNum = Math.min(parseInt(limit) || 10, 50);
+
+    let matchQuery = {};
+
+    // If there's a search query, filter by it
+    if (query && query.trim()) {
+      const searchTerms = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+      if (searchTerms.length > 0) {
+        const regexPattern = searchTerms.join('|');
+        matchQuery = {
+          $or: [
+            { businessname: { $regex: regexPattern, $options: 'i' } },
+            { categories: { $regex: regexPattern, $options: 'i' } }
+          ]
+        };
+      }
+    }
+
+    // Add cursor for pagination
+    if (cursor) {
+      const { ObjectId } = await import('mongodb');
+      matchQuery._id = { $gt: new ObjectId(cursor) };
+    }
+
+    const items = await placesCollection
+      .find(matchQuery)
+      .sort({ _id: 1 })
+      .limit(limitNum + 1) // Fetch one extra to check if there's more
+      .project({ embedding: 0 })
+      .toArray();
+
+    const hasMore = items.length > limitNum;
+    if (hasMore) {
+      items.pop(); // Remove the extra item
+    }
+
+    const nextCursor = hasMore && items.length > 0 ? items[items.length - 1]._id.toString() : null;
+
+    // Get total count (cached or computed)
+    const total = await placesCollection.countDocuments(query && query.trim() ? matchQuery : {});
+
+    res.json({
+      items,
+      nextCursor,
+      hasMore,
+      total
+    });
+
+  } catch (error) {
+    console.error('Infinite scroll error:', error);
+    res.status(500).json({ error: 'Failed to fetch places' });
+  }
+});
+
+// ============================================
+// EVENTS VECTOR SEARCH
+// ============================================
+
+/**
+ * POST /api/events/vibe-search
+ * Semantic vector search for events
+ */
+app.post('/api/events/vibe-search', async (req, res) => {
+  const startTime = Date.now();
+
+  try {
+    const { query, limit = 20, filters = {} } = req.body;
+
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    const queryEmbedding = await getQueryEmbedding(query);
+    let results;
+
+    if (queryEmbedding) {
+      const pipeline = [
+        {
+          $vectorSearch: {
+            index: 'events_vibe_index',
+            path: 'embedding',
+            queryVector: queryEmbedding,
+            numCandidates: 100,
+            limit: limit
+          }
+        },
+        {
+          $addFields: {
+            score: { $meta: 'vectorSearchScore' }
+          }
+        }
+      ];
+
+      // Date filter
+      if (filters.startDate) {
+        pipeline.push({
+          $match: { start_time: { $gte: filters.startDate } }
+        });
+      }
+
+      // Category filter
+      if (filters.categories && filters.categories.length > 0) {
+        pipeline.push({
+          $match: {
+            categories: { $elemMatch: { $regex: filters.categories.join('|'), $options: 'i' } }
+          }
+        });
+      }
+
+      pipeline.push({ $project: { embedding: 0 } });
+
+      results = await eventsCollection.aggregate(pipeline).toArray();
+    } else {
+      // Fallback to text search
+      console.log('Falling back to text search for events:', query);
+      const searchTerms = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+      const regexPattern = searchTerms.join('|');
+
+      results = await eventsCollection
+        .find({
+          $or: [
+            { title: { $regex: regexPattern, $options: 'i' } },
+            { description: { $regex: regexPattern, $options: 'i' } },
+            { 'venue.name': { $regex: regexPattern, $options: 'i' } }
+          ]
+        })
+        .limit(limit)
+        .project({ embedding: 0 })
+        .toArray();
+    }
+
+    res.json({
+      results,
+      query,
+      count: results.length,
+      took_ms: Date.now() - startTime
+    });
+
+  } catch (error) {
+    console.error('Events vibe search error:', error);
+    res.status(500).json({ error: 'Failed to search events' });
+  }
+});
+
+// ============================================
+// REDDIT VECTOR SEARCH  
+// ============================================
+
+let redditCollection;
+
+/**
+ * POST /api/reddit/vibe-search
+ * Semantic vector search for reddit posts
+ */
+app.post('/api/reddit/vibe-search', async (req, res) => {
+  const startTime = Date.now();
+
+  try {
+    // Initialize reddit collection if not done
+    if (!redditCollection) {
+      redditCollection = db.collection('reddit_posts');
+    }
+
+    const { query, limit = 20, filters = {} } = req.body;
+
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    const queryEmbedding = await getQueryEmbedding(query);
+    let results;
+
+    if (queryEmbedding) {
+      const pipeline = [
+        {
+          $vectorSearch: {
+            index: 'reddit_vibe_index',
+            path: 'embedding',
+            queryVector: queryEmbedding,
+            numCandidates: 100,
+            limit: limit
+          }
+        },
+        {
+          $addFields: {
+            score: { $meta: 'vectorSearchScore' }
+          }
+        }
+      ];
+
+      // Hidden gems filter
+      if (filters.hiddenGemsOnly) {
+        pipeline.push({ $match: { isHiddenGem: true } });
+      }
+
+      // Subreddit filter
+      if (filters.subreddit) {
+        pipeline.push({ $match: { subreddit: filters.subreddit } });
+      }
+
+      // Min upvotes filter
+      if (filters.minUpvotes) {
+        pipeline.push({ $match: { ups: { $gte: filters.minUpvotes } } });
+      }
+
+      pipeline.push({ $project: { embedding: 0 } });
+
+      results = await redditCollection.aggregate(pipeline).toArray();
+    } else {
+      // Fallback to text search
+      console.log('Falling back to text search for reddit:', query);
+      const searchTerms = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+      const regexPattern = searchTerms.join('|');
+
+      const matchQuery = {
+        $or: [
+          { title: { $regex: regexPattern, $options: 'i' } },
+          { text: { $regex: regexPattern, $options: 'i' } },
+          { selftext: { $regex: regexPattern, $options: 'i' } }
+        ]
+      };
+
+      if (filters.hiddenGemsOnly) matchQuery.isHiddenGem = true;
+      if (filters.subreddit) matchQuery.subreddit = filters.subreddit;
+
+      results = await redditCollection
+        .find(matchQuery)
+        .sort({ ups: -1 })
+        .limit(limit)
+        .project({ embedding: 0 })
+        .toArray();
+    }
+
+    res.json({
+      results,
+      query,
+      count: results.length,
+      took_ms: Date.now() - startTime
+    });
+
+  } catch (error) {
+    console.error('Reddit vibe search error:', error);
+    res.status(500).json({ error: 'Failed to search reddit posts' });
+  }
+});
+
+/**
+ * GET /api/reddit/hidden-gems
+ * Get highly-upvoted hidden gem recommendations
+ */
+app.get('/api/reddit/hidden-gems', async (req, res) => {
+  try {
+    if (!redditCollection) {
+      redditCollection = db.collection('reddit_posts');
+    }
+
+    const { limit = 10 } = req.query;
+
+    const gems = await redditCollection
+      .find({ isHiddenGem: true })
+      .sort({ ups: -1, relevanceScore: -1 })
+      .limit(parseInt(limit))
+      .project({ embedding: 0 })
+      .toArray();
+
+    res.json({
+      results: gems,
+      count: gems.length
+    });
+
+  } catch (error) {
+    console.error('Hidden gems error:', error);
+    res.status(500).json({ error: 'Failed to fetch hidden gems' });
+  }
+});
+
+// ============================================
+// UNIFIED SEARCH (All collections)
+// ============================================
+
+/**
+ * POST /api/search/unified
+ * Search across places, events, and reddit simultaneously
+ */
+app.post('/api/search/unified', async (req, res) => {
+  const startTime = Date.now();
+
+  try {
+    const { query, limit = 10 } = req.body;
+
+    if (!query || query.trim().length === 0) {
+      return res.status(400).json({ error: 'Search query is required' });
+    }
+
+    // Initialize reddit collection
+    if (!redditCollection) {
+      redditCollection = db.collection('reddit_posts');
+    }
+
+    const queryEmbedding = await getQueryEmbedding(query);
+    
+    // Search all three collections in parallel
+    const [places, events, reddit] = await Promise.all([
+      // Places search
+      queryEmbedding
+        ? placesCollection.aggregate([
+            { $vectorSearch: { index: 'vibe_index', path: 'embedding', queryVector: queryEmbedding, numCandidates: 50, limit: limit } },
+            { $addFields: { score: { $meta: 'vectorSearchScore' }, type: 'place' } },
+            { $project: { embedding: 0 } }
+          ]).toArray()
+        : placesCollection.find({ businessname: { $regex: query, $options: 'i' } }).limit(limit).project({ embedding: 0 }).toArray().then(r => r.map(p => ({ ...p, type: 'place' }))),
+      
+      // Events search
+      queryEmbedding
+        ? eventsCollection.aggregate([
+            { $vectorSearch: { index: 'events_vibe_index', path: 'embedding', queryVector: queryEmbedding, numCandidates: 50, limit: limit } },
+            { $addFields: { score: { $meta: 'vectorSearchScore' }, type: 'event' } },
+            { $project: { embedding: 0 } }
+          ]).toArray()
+        : eventsCollection.find({ title: { $regex: query, $options: 'i' } }).limit(limit).project({ embedding: 0 }).toArray().then(r => r.map(e => ({ ...e, type: 'event' }))),
+      
+      // Reddit search
+      queryEmbedding
+        ? redditCollection.aggregate([
+            { $vectorSearch: { index: 'reddit_vibe_index', path: 'embedding', queryVector: queryEmbedding, numCandidates: 50, limit: limit } },
+            { $addFields: { score: { $meta: 'vectorSearchScore' }, type: 'reddit' } },
+            { $project: { embedding: 0 } }
+          ]).toArray()
+        : redditCollection.find({ title: { $regex: query, $options: 'i' } }).limit(limit).project({ embedding: 0 }).toArray().then(r => r.map(p => ({ ...p, type: 'reddit' })))
+    ]);
+
+    res.json({
+      query,
+      places: { results: places, count: places.length },
+      events: { results: events, count: events.length },
+      reddit: { results: reddit, count: reddit.length },
+      took_ms: Date.now() - startTime
+    });
+
+  } catch (error) {
+    console.error('Unified search error:', error);
+    res.status(500).json({ error: 'Failed to search' });
+  }
+});
+
 // Start server
 connectDB().then(() => {
   app.listen(PORT, () => {

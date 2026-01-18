@@ -106,9 +106,9 @@ const KEYWORDS: Record<string, string[]> = {
     culture: ['gallery', 'art', 'museum', 'theater', 'performance', 'music venue', 'jazz', 'blues', 'classical']
 };
 
-const NEGATIVE_KEYWORDS = ['crime', 'police', 'arrest', 'shooting', 'accident', 'traffic', 'housing', 'rent', 'politics', 'election', 'mayor', 'protest', 'strike', 'legal', 'warning', 'ice surge', 'arrested'];
+const NEGATIVE_KEYWORDS = ['crime', 'police', 'arrest', 'shooting', 'accident', 'traffic', 'housing', 'rent', 'politics', 'election', 'mayor', 'protest', 'strike', 'legal', 'warning', 'ice surge', 'arrested', 'homeless', 'migrant', 'crisis', 'budget', 'city council', 'legislation', 'Elon', 'Tesla', 'Trump', 'Biden', 'Senator', 'Governor'];
 
-const TOURIST_TRAPS = ['faneuil hall', 'quincy market', 'cheers', "mike's pastry"];
+const TOURIST_TRAPS = ['faneuil hall', 'quincy market', 'cheers', "mike's pastry", 'union oyster house', 'legal sea foods', 'starbucks'];
 const BOSTON_PLACES = ['fenway', 'back bay', 'beacon hill', 'north end', 'south end', 'seaport', 'cambridge',
     'somerville', 'brookline', 'downtown', 'chinatown', 'south boston', 'charlestown', 'harvard square',
     'newbury street', 'copley', 'prudential', 'boston common', 'worcester', 'framingham', 'south station',
@@ -655,6 +655,19 @@ async function runScraper() {
     console.log(`Starting scraper for ${SUBREDDITS.length} subreddits...`);
 
     let savedCount = 0;
+    const processedThisRun = new Set<string>();
+
+    // Pre-fetch all IDs in the database to avoid redundant scraping
+    const existingIds = new Set<string>();
+    if (collection) {
+        try {
+            const docs = await collection.find({}, { projection: { id: 1 } }).toArray();
+            docs.forEach(doc => existingIds.add(doc.id));
+            console.log(`✓ Cached ${existingIds.size} existing IDs from database.`);
+        } catch (e) {
+            console.error("Failed to fetch existing IDs:", e);
+        }
+    }
 
     for (const sub of SUBREDDITS) {
         console.log(`\nScraping r/${sub}...`);
@@ -671,6 +684,9 @@ async function runScraper() {
             const posts = data.data?.children || [];
 
             for (const { data: post } of posts) {
+                // Skip if already processed in this RUN or exists in DB
+                if (processedThisRun.has(post.name) || existingIds.has(post.name)) continue;
+
                 if (!isTemporallyRelevant(post)) continue;
 
                 const categories = categorizePost(post.title, post.selftext);
@@ -712,6 +728,7 @@ async function runScraper() {
                 };
 
                 await saveData(collection, doc);
+                processedThisRun.add(post.name);
                 savedCount++;
             }
         }

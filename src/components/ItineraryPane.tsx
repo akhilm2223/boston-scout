@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react';
 import { ItineraryEvent } from '../types';
 import './ItineraryPane.css';
 
@@ -22,6 +23,37 @@ export default function ItineraryPane({
   onDragOver,
   onDragEnd,
 }: ItineraryPaneProps) {
+  // Track new items for animation
+  const [newItemIds, setNewItemIds] = useState<Set<string>>(new Set());
+  const prevItemsRef = useRef<ItineraryEvent[]>([]);
+
+  // Detect newly added items
+  useEffect(() => {
+    const prevIds = new Set(prevItemsRef.current.map(item => item.id));
+    const currentIds = new Set(items.map(item => item.id));
+
+    // Find new IDs (in current but not in previous)
+    const newIds: string[] = [];
+    currentIds.forEach(id => {
+      if (!prevIds.has(id)) {
+        newIds.push(id);
+      }
+    });
+
+    if (newIds.length > 0) {
+      setNewItemIds(new Set(newIds));
+
+      // Remove new-item class after animation completes
+      const timer = setTimeout(() => {
+        setNewItemIds(new Set());
+      }, 500); // Match animation duration
+
+      return () => clearTimeout(timer);
+    }
+
+    prevItemsRef.current = items;
+  }, [items]);
+
   return (
     <div className="itinerary-column">
       <div className="column-header">
@@ -32,7 +64,7 @@ export default function ItineraryPane({
           {items.map((stop, index) => (
             <div
               key={stop.id}
-              className={`itinerary-item ${selectedStop === stop.id ? "selected" : ""} ${draggedIndex === index ? "dragging" : ""}`}
+              className={`itinerary-item ${selectedStop === stop.id ? "selected" : ""} ${draggedIndex === index ? "dragging" : ""} ${newItemIds.has(stop.id) ? "new-item" : ""}`}
               onClick={() => onStopClick(stop)}
               draggable
               onDragStart={() => onDragStart(index)}

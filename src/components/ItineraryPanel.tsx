@@ -1,10 +1,10 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import '@/components/ItineraryPanel.css';
 import "@/App.css";
 import StepOne from './StepOne'; 
 import StepTwo from './StepTwo';
 import { ItineraryEvent } from '../types'; 
-import DiscoveryPane from './DiscoveryPane';
+import DiscoveryPane, { DiscoveryPaneRef } from './DiscoveryPane';
 import ItineraryPane from './ItineraryPane';
 import SearchBar from './SearchBar';
 import { TripDates, WalkingPreferences } from '../App';
@@ -44,6 +44,7 @@ export default function ItineraryPanel({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [items, setItems] = useState<ItineraryEvent[]>(customEvents);
   const [isSearching, setIsSearching] = useState(false);
+  const discoveryPaneRef = useRef<DiscoveryPaneRef>(null);
 
   // Sync items with customEvents prop
   useEffect(() => {
@@ -53,8 +54,10 @@ export default function ItineraryPanel({
   const handleSearchSubmit = useCallback(() => {
     if (searchQuery.trim()) {
       setIsSearching(true);
-      // Reset searching state after a timeout to simulate loading "handoff"
-      setTimeout(() => setIsSearching(false), 1000);
+      // Trigger immediate search via ref
+      discoveryPaneRef.current?.triggerSearch(searchQuery);
+      // Reset searching state after search completes
+      setTimeout(() => setIsSearching(false), 500);
     }
   }, [searchQuery]);
 
@@ -132,9 +135,11 @@ export default function ItineraryPanel({
 					<div className="dual-panel-container">
 						{/* Discovery Pane - Left Side */}
 						<DiscoveryPane
+							ref={discoveryPaneRef}
 							onAddToItinerary={handleAddToItinerary}
 							onLocationClick={onLocationClick}
 							activeSearchQuery={searchQuery}
+							onSearchStateChange={setIsSearching}
 						/>
 
 						{/* Itinerary Pane - Right Side */}

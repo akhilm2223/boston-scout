@@ -1,21 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { formatEventDate, formatEventTime } from '../services/eventsApi';
-import { BostonEvent } from '../types';
+import { BostonEvent, ItineraryEvent } from '../types';
 import './EventSearchPanel.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-
-export interface ItineraryEvent {
-    id: string;
-    name: string;
-    location: [number, number];
-    time: string;
-    duration: string;
-    vibe: string;
-    sentiment: 'positive' | 'neutral' | 'warning';
-    category: 'transit' | 'food' | 'attraction' | 'university' | 'event';
-    eventData?: BostonEvent;
-}
 
 export interface EventSearchPanelProps {
     onAddToItinerary: (event: ItineraryEvent) => void;
@@ -125,7 +113,7 @@ export default function EventSearchPanel({ onAddToItinerary, onLocationClick, ac
         const itineraryEvent: ItineraryEvent = {
             id: event._id,
             name: event.title,
-            location: [event.venue.lng, event.venue.lat],
+            location: { lat: event.venue.lat, lng: event.venue.lng },
             time: formatEventTime(event.start_time),
             duration: calculateDuration(event.start_time, event.end_time),
             vibe: event.venue.name,
@@ -193,7 +181,7 @@ export default function EventSearchPanel({ onAddToItinerary, onLocationClick, ac
                                             const itineraryEvent: ItineraryEvent = {
                                                 id: event._id,
                                                 name: event.title,
-                                                location: [event.venue.lng, event.venue.lat],
+                                                location: { lat: event.venue.lat, lng: event.venue.lng },
                                                 time: formatEventTime(event.start_time),
                                                 duration: calculateDuration(event.start_time, event.end_time),
                                                 vibe: event.venue.name,

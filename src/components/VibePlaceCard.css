@@ -1,0 +1,268 @@
+/* VibePlaceCard - Horizontal Discovery Card */
+/* Height: 120px | 1px border | No shadows */
+
+.vibe-place-card {
+  position: relative;
+  height: 120px;
+  min-height: 120px;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 0;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.vibe-place-card:hover {
+  border-color: var(--text-muted);
+  transform: translateX(4px);
+}
+
+.vibe-place-card.added {
+  opacity: 0.7;
+  border-color: var(--border-primary);
+}
+
+/* Image Section - 40% width */
+.card-image-section {
+  width: 40%;
+  min-width: 40%;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-image {
+  position: absolute;
+  inset: 0;
+  background-image: var(--card-image);
+  background-size: cover;
+  background-position: center;
+  /* Grayscale by default, color on hover */
+  filter: grayscale(0.3);
+  transition: filter 0.3s ease, transform 0.3s ease;
+}
+
+.vibe-place-card:hover .card-image {
+  filter: grayscale(0);
+  transform: scale(1.05);
+}
+
+/* Gradient overlay for image fade to content */
+.card-image-section::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  background: linear-gradient(to right, transparent, var(--bg-primary));
+  pointer-events: none;
+}
+
+/* Content Section - 60% width */
+.card-content-section {
+  flex: 1;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0; /* Allow text truncation */
+}
+
+.card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.meta-rating {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.meta-rating .star {
+  color: #ffd700;
+}
+
+.meta-price {
+  color: var(--text-muted);
+}
+
+.meta-category {
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-address {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Sentiment Badge */
+.sentiment-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-size: 11px;
+  font-weight: 500;
+  width: fit-content;
+  margin-top: 2px;
+}
+
+.sentiment-badge.trending {
+  background: rgba(255, 100, 50, 0.15);
+  color: #ff6432;
+  border: 1px solid rgba(255, 100, 50, 0.3);
+}
+
+.sentiment-badge.hidden_gem {
+  background: rgba(100, 200, 255, 0.15);
+  color: #64c8ff;
+  border: 1px solid rgba(100, 200, 255, 0.3);
+}
+
+.sentiment-badge.local_favorite {
+  background: rgba(255, 215, 0, 0.15);
+  color: #ffd700;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+/* Glowing animation for badges */
+.sentiment-badge.glowing {
+  animation: badge-glow 2s ease-in-out infinite;
+}
+
+@keyframes badge-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px currentColor;
+  }
+  50% {
+    box-shadow: 0 0 15px currentColor, 0 0 25px currentColor;
+  }
+}
+
+.badge-emoji {
+  font-size: 12px;
+}
+
+.badge-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Action Button */
+.card-actions {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.action-btn {
+  padding: 8px 16px;
+  border-radius: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.action-btn.add {
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  border: 1px solid var(--text-primary);
+}
+
+.action-btn.add:hover:not(:disabled) {
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.action-btn.add.added,
+.action-btn.add:disabled {
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  border-color: var(--border-primary);
+  cursor: default;
+}
+
+/* Added Badge Overlay */
+.added-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  color: var(--bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  z-index: 10;
+}
+
+/* Fade out animation for skipped cards */
+.vibe-place-card.skipping {
+  animation: card-skip 0.3s ease forwards;
+}
+
+@keyframes card-skip {
+  to {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+}
+
+/* Slide in animation for adding to itinerary */
+.vibe-place-card.adding {
+  animation: card-add 0.4s ease forwards;
+}
+
+@keyframes card-add {
+  0% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(10px);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}

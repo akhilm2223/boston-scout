@@ -1,24 +1,244 @@
+import { useState, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { ItineraryEvent } from '../types';
-import EventSearchPanel from './EventSearchPanel';
+import type { VectorSearchResult, HeroOption } from '../types/vector';
+import { useVectorSearch } from '../hooks/useVectorSearch';
+import { useCityPulse } from '../hooks/useCityPulse';
+import HeroOptions from './HeroOptions';
+import VirtualDiscoveryList from './VirtualDiscoveryList';
+import './DiscoveryPane.css';
+
+export interface DiscoveryPaneRef {
+  triggerSearch: (query: string) => void;
+}
 
 interface DiscoveryPaneProps {
   onAddToItinerary: (event: ItineraryEvent) => void;
   onLocationClick: (location: [number, number], name: string) => void;
   activeSearchQuery: string;
+  onSearchStateChange?: (isSearching: boolean) => void;
 }
 
-export default function DiscoveryPane({
+/**
+ * Discovery Pane with Vector Search and Virtual Scrolling
+ *
+ * Layout:
+ * ┌─────────────────────────┐
+ * │ Filters (rating/price)  │
+ * ├─────────────────────────┤
+ * │ Hero Options (4 picks)  │
+ * ├─────────────────────────┤
+ * │ Virtual Scrolling List  │
+ * │ (react-window)          │
+ * │                         │
+ * └─────────────────────────┘
+ */
+const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
   onAddToItinerary,
   onLocationClick,
   activeSearchQuery,
-}: DiscoveryPaneProps) {
+  onSearchStateChange,
+}, ref) => {
+  // Track added place IDs
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+  
+  // Filter state
+  const [showFilters, setShowFilters] = useState(false);
+  const [minRating, setMinRating] = useState<number>(0);
+  const [priceLevel, setPriceLevel] = useState<number | null>(null);
+  
+  // Check if any filter is active
+  const hasActiveFilters = minRating > 0 || priceLevel !== null;
+
+  // Vector search hook
+  const {
+    query,
+    setQuery,
+    results,
+    isLoading,
+    error,
+    hasMore,
+    loadMore,
+    search
+  } = useVectorSearch({ debounceMs: 300, initialLimit: 20 });
+
+  // City pulse hook for hero options
+  const {
+    heroOptions,
+    cityPulse,
+    isLoading: isPulseLoading
+  } = useCityPulse({ updateIntervalMs: 60000 });
+
+  // Expose search function via ref
+  useImperativeHandle(ref, () => ({
+    triggerSearch: (searchQuery: string) => {
+      if (searchQuery.trim()) {
+        search(searchQuery);
+      }
+    }
+  }), [search]);
+
+  // Notify parent of search state changes
+  useEffect(() => {
+    onSearchStateChange?.(isLoading);
+  }, [isLoading, onSearchStateChange]);
+
+  // Sync with external search query
+  useEffect(() => {
+    if (activeSearchQuery && activeSearchQuery !== query) {
+      setQuery(activeSearchQuery);
+    }
+  }, [activeSearchQuery, query, setQuery]);
+
+  // Initial load - search for popular places
+  useEffect(() => {
+    if (results.length === 0 && !query) {
+      search('popular restaurant boston');
+    }
+  }, [results.length, query, search]);
+
+  // Filter results client-side
+  const filteredResults = results.filter(place => {
+    if (minRating > 0 && (place.rating || 0) < minRating) return false;
+    if (priceLevel !== null && place.price_level !== priceLevel) return false;
+    return true;
+  });
+
+  /**
+   * Handle hero option click
+   */
+  const handleHeroClick = useCallback((option: HeroOption) => {
+    setQuery(option.query);
+  }, [setQuery]);
+
+  /**
+   * Convert place to itinerary event and add
+   */
+  const handleAddPlace = useCallback((place: VectorSearchResult) => {
+    if (addedIds.has(place._id)) return;
+
+    const event: ItineraryEvent = {
+      id: place._id,
+      name: place.businessname,
+      location: { lat: place.latitude, lng: place.longitude },
+      time: '',
+      duration: '1-2 hours',
+      vibe: place.categories
+        ? (typeof place.categories === 'string' ? place.categories : place.categories[0])
+        : 'dining',
+      sentiment: place.rating && place.rating >= 4.5 ? 'positive' : 'neutral',
+      category: 'food'
+    };
+
+    onAddToItinerary(event);
+    setAddedIds(prev => new Set(prev).add(place._id));
+  }, [addedIds, onAddToItinerary]);
+
+  /**
+   * Handle skip (just track for now, could be used for recommendations)
+   */
+  const handleSkipPlace = useCallback((place: VectorSearchResult) => {
+    // Could track skipped places for better recommendations
+    console.log('Skipped:', place.businessname);
+  }, []);
+
+  /**
+   * Handle place click - fly to location on map
+   */
+  const handlePlaceClick = useCallback((place: VectorSearchResult) => {
+    if (place.longitude && place.latitude) {
+      onLocationClick([place.longitude, place.latitude], place.businessname);
+    }
+  }, [onLocationClick]);
+
   return (
     <div className="discovery-column">
-      <EventSearchPanel
-        onAddToItinerary={onAddToItinerary}
-        onLocationClick={onLocationClick}
-        activeSearchQuery={activeSearchQuery}
+      {/* Column Header with Filter Toggle */}
+      <div className="column-header">
+        <h2>Discover</h2>
+        <button 
+          className={`filter-toggle-btn ${showFilters ? 'active' : ''} ${hasActiveFilters ? 'has-filters' : ''}`}
+          onClick={() => setShowFilters(!showFilters)}
+        >
+          <span className="filter-icon">⚙</span>
+          {hasActiveFilters && <span className="filter-badge">{(minRating > 0 ? 1 : 0) + (priceLevel !== null ? 1 : 0)}</span>}
+        </button>
+      </div>
+
+      {/* Collapsible Filters */}
+      {showFilters && (
+        <div className="discovery-filters">
+          {/* Rating Filter */}
+          <div className="filter-group">
+            <label className="filter-label">Min Rating</label>
+            <div className="filter-buttons">
+              {[0, 3, 3.5, 4, 4.5].map((rating) => (
+                <button
+                  key={rating}
+                  className={`filter-btn ${minRating === rating ? 'active' : ''}`}
+                  onClick={() => setMinRating(rating)}
+                >
+                  {rating === 0 ? 'Any' : `${rating}★`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Price Filter */}
+          <div className="filter-group">
+            <label className="filter-label">Price</label>
+            <div className="filter-buttons">
+              <button
+                className={`filter-btn ${priceLevel === null ? 'active' : ''}`}
+                onClick={() => setPriceLevel(null)}
+              >
+                Any
+              </button>
+              {[1, 2, 3, 4].map((level) => (
+                <button
+                  key={level}
+                  className={`filter-btn ${priceLevel === level ? 'active' : ''}`}
+                  onClick={() => setPriceLevel(level)}
+                >
+                  {'$'.repeat(level)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Clear Filters */}
+          {hasActiveFilters && (
+            <button 
+              className="clear-filters-btn"
+              onClick={() => { setMinRating(0); setPriceLevel(null); }}
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Hero Options */}
+      <HeroOptions
+        options={heroOptions}
+        onOptionClick={handleHeroClick}
+        isLoading={isPulseLoading}
+        cityPulse={cityPulse}
+      />
+
+      {/* Virtual Scrolling List */}
+      <VirtualDiscoveryList
+        items={filteredResults}
+        hasMore={hasMore}
+        isLoading={isLoading}
+        onLoadMore={loadMore}
+        addedIds={addedIds}
+        onAddPlace={handleAddPlace}
+        onSkipPlace={handleSkipPlace}
+        onPlaceClick={handlePlaceClick}
+        emptyMessage={error || 'Search for places to discover'}
       />
     </div>
   );
-}
+});
+
+export default DiscoveryPane;
