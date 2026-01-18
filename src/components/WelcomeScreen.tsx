@@ -1,6 +1,20 @@
 import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
-import { Mic, MessageSquare } from 'lucide-react';
+
+// Icon Components (inline SVG to avoid lucide-react dependency issues)
+const MicIcon = () => (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+        <line x1="12" x2="12" y1="19" y2="22"/>
+    </svg>
+);
+
+const MessageSquareIcon = () => (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    </svg>
+);
 
 interface WelcomeScreenProps {
     onStart: (mode: 'voice' | 'chat') => void;
@@ -258,7 +272,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
                         }}
                     >
                         <div style={{ marginBottom: '12px', color: 'cyan', filter: 'drop-shadow(0 0 5px rgba(0,255,255,0.6))' }}>
-                            <Mic size={32} />
+                            <MicIcon />
                         </div>
                         <h2 style={{
                             fontSize: '1.1rem',
@@ -305,7 +319,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStart }) => {
                         }}
                     >
                         <div style={{ marginBottom: '12px', color: 'white', filter: 'drop-shadow(0 0 5px rgba(255,255,255,0.6))' }}>
-                            <MessageSquare size={32} />
+                            <MessageSquareIcon />
                         </div>
                         <h2 style={{
                             fontSize: '1.1rem',
