@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { ItineraryEvent } from '../types';
-import type { VectorSearchResult, HeroOption } from '../types/vector';
+import type { VectorSearchResult, EventSearchResult, HeroOption, UnifiedSearchResult } from '../types/vector';
 import { useVectorSearch } from '../hooks/useVectorSearch';
 import { useCityPulse } from '../hooks/useCityPulse';
 import HeroOptions from './HeroOptions';
@@ -45,9 +45,6 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
   const [showFilters, setShowFilters] = useState(false);
   const [minRating, setMinRating] = useState<number>(0);
   const [priceLevel, setPriceLevel] = useState<number | null>(null);
-  
-  // Check if any filter is active
-  const hasActiveFilters = minRating > 0 || priceLevel !== null;
 
   // Vector search hook
   const {
@@ -58,8 +55,13 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
     error,
     hasMore,
     loadMore,
-    search
+    search,
+    searchType,
+    setSearchType
   } = useVectorSearch({ debounceMs: 300, initialLimit: 20 });
+  
+  // Check if any filter is active
+  const hasActiveFilters = minRating > 0 || priceLevel !== null || searchType !== 'places';
 
   // City pulse hook for hero options
   const {
@@ -97,7 +99,11 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
   }, [results.length, query, search]);
 
   // Filter results client-side
-  const filteredResults = results.filter(place => {
+  const filteredResults = results.filter(item => {
+    // Events don't have rating/price filters
+    if (item.type === 'event') return true;
+    // For places, apply filters
+    const place = item as VectorSearchResult;
     if (minRating > 0 && (place.rating || 0) < minRating) return false;
     if (priceLevel !== null && place.price_level !== priceLevel) return false;
     return true;
@@ -111,42 +117,68 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
   }, [setQuery]);
 
   /**
-   * Convert place to itinerary event and add
+   * Convert place or event to itinerary event and add
    */
-  const handleAddPlace = useCallback((place: VectorSearchResult) => {
-    if (addedIds.has(place._id)) return;
+  const handleAddItem = useCallback((item: UnifiedSearchResult) => {
+    if (addedIds.has(item._id)) return;
 
-    const event: ItineraryEvent = {
-      id: place._id,
-      name: place.businessname,
-      location: { lat: place.latitude, lng: place.longitude },
-      time: '',
-      duration: '1-2 hours',
-      vibe: place.categories
-        ? (typeof place.categories === 'string' ? place.categories : place.categories[0])
-        : 'dining',
-      sentiment: place.rating && place.rating >= 4.5 ? 'positive' : 'neutral',
-      category: 'food'
-    };
+    let event: ItineraryEvent;
+
+    if (item.type === 'event') {
+      const eventItem = item as EventSearchResult;
+      event = {
+        id: eventItem._id,
+        name: eventItem.title,
+        location: { lat: eventItem.venue.lat, lng: eventItem.venue.lng },
+        time: eventItem.start_time,
+        duration: '2 hours',
+        vibe: eventItem.category || 'entertainment',
+        sentiment: 'positive',
+        category: 'event'
+      };
+    } else {
+      const place = item as VectorSearchResult;
+      event = {
+        id: place._id,
+        name: place.businessname,
+        location: { lat: place.latitude, lng: place.longitude },
+        time: '',
+        duration: '1-2 hours',
+        vibe: place.categories
+          ? (typeof place.categories === 'string' ? place.categories : place.categories[0])
+          : 'dining',
+        sentiment: place.rating && place.rating >= 4.5 ? 'positive' : 'neutral',
+        category: 'food'
+      };
+    }
 
     onAddToItinerary(event);
-    setAddedIds(prev => new Set(prev).add(place._id));
+    setAddedIds(prev => new Set(prev).add(item._id));
   }, [addedIds, onAddToItinerary]);
 
   /**
    * Handle skip (just track for now, could be used for recommendations)
    */
-  const handleSkipPlace = useCallback((place: VectorSearchResult) => {
-    // Could track skipped places for better recommendations
-    console.log('Skipped:', place.businessname);
+  const handleSkipItem = useCallback((item: UnifiedSearchResult) => {
+    // Could track skipped items for better recommendations
+    const name = item.type === 'event' ? (item as EventSearchResult).title : (item as VectorSearchResult).businessname;
+    console.log('Skipped:', name);
   }, []);
 
   /**
-   * Handle place click - fly to location on map
+   * Handle item click - fly to location on map
    */
-  const handlePlaceClick = useCallback((place: VectorSearchResult) => {
-    if (place.longitude && place.latitude) {
-      onLocationClick([place.longitude, place.latitude], place.businessname);
+  const handleItemClick = useCallback((item: UnifiedSearchResult) => {
+    if (item.type === 'event') {
+      const event = item as EventSearchResult;
+      if (event.venue.lng && event.venue.lat) {
+        onLocationClick([event.venue.lng, event.venue.lat], event.title);
+      }
+    } else {
+      const place = item as VectorSearchResult;
+      if (place.longitude && place.latitude) {
+        onLocationClick([place.longitude, place.latitude], place.businessname);
+      }
     }
   }, [onLocationClick]);
 
@@ -167,49 +199,78 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
       {/* Collapsible Filters */}
       {showFilters && (
         <div className="discovery-filters">
-          {/* Rating Filter */}
+          {/* Search Type Filter */}
           <div className="filter-group">
-            <label className="filter-label">Min Rating</label>
+            <label className="filter-label">Search In</label>
             <div className="filter-buttons">
-              {[0, 3, 3.5, 4, 4.5].map((rating) => (
-                <button
-                  key={rating}
-                  className={`filter-btn ${minRating === rating ? 'active' : ''}`}
-                  onClick={() => setMinRating(rating)}
-                >
-                  {rating === 0 ? 'Any' : `${rating}★`}
-                </button>
-              ))}
+              <button
+                className={`filter-btn ${searchType === 'places' ? 'active' : ''}`}
+                onClick={() => setSearchType('places')}
+              >
+                🍽️ Places
+              </button>
+              <button
+                className={`filter-btn ${searchType === 'events' ? 'active' : ''}`}
+                onClick={() => setSearchType('events')}
+              >
+                🎭 Events
+              </button>
+              <button
+                className={`filter-btn ${searchType === 'all' ? 'active' : ''}`}
+                onClick={() => setSearchType('all')}
+              >
+                All
+              </button>
             </div>
           </div>
 
-          {/* Price Filter */}
-          <div className="filter-group">
-            <label className="filter-label">Price</label>
-            <div className="filter-buttons">
-              <button
-                className={`filter-btn ${priceLevel === null ? 'active' : ''}`}
-                onClick={() => setPriceLevel(null)}
-              >
-                Any
-              </button>
-              {[1, 2, 3, 4].map((level) => (
-                <button
-                  key={level}
-                  className={`filter-btn ${priceLevel === level ? 'active' : ''}`}
-                  onClick={() => setPriceLevel(level)}
-                >
-                  {'$'.repeat(level)}
-                </button>
-              ))}
+          {/* Rating Filter - only for places */}
+          {searchType !== 'events' && (
+            <div className="filter-group">
+              <label className="filter-label">Min Rating</label>
+              <div className="filter-buttons">
+                {[0, 3, 3.5, 4, 4.5].map((rating) => (
+                  <button
+                    key={rating}
+                    className={`filter-btn ${minRating === rating ? 'active' : ''}`}
+                    onClick={() => setMinRating(rating)}
+                  >
+                    {rating === 0 ? 'Any' : `${rating}★`}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Price Filter - only for places */}
+          {searchType !== 'events' && (
+            <div className="filter-group">
+              <label className="filter-label">Price</label>
+              <div className="filter-buttons">
+                <button
+                  className={`filter-btn ${priceLevel === null ? 'active' : ''}`}
+                  onClick={() => setPriceLevel(null)}
+                >
+                  Any
+                </button>
+                {[1, 2, 3, 4].map((level) => (
+                  <button
+                    key={level}
+                    className={`filter-btn ${priceLevel === level ? 'active' : ''}`}
+                    onClick={() => setPriceLevel(level)}
+                  >
+                    {'$'.repeat(level)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Clear Filters */}
           {hasActiveFilters && (
             <button 
               className="clear-filters-btn"
-              onClick={() => { setMinRating(0); setPriceLevel(null); }}
+              onClick={() => { setMinRating(0); setPriceLevel(null); setSearchType('places'); }}
             >
               Clear filters
             </button>
@@ -232,10 +293,10 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
         isLoading={isLoading}
         onLoadMore={loadMore}
         addedIds={addedIds}
-        onAddPlace={handleAddPlace}
-        onSkipPlace={handleSkipPlace}
-        onPlaceClick={handlePlaceClick}
-        emptyMessage={error || 'Search for places to discover'}
+        onAddItem={handleAddItem}
+        onSkipItem={handleSkipItem}
+        onItemClick={handleItemClick}
+        emptyMessage={error || 'Search for places and events to discover'}
       />
     </div>
   );

@@ -49,7 +49,7 @@ function App() {
   });
 
   // Dark mode state - controls theme across the entire app
-  const [isDarkMode, setIsDarkMode] = useState(true); // Default to dark mode for industrial theme
+  const [isDarkMode, setIsDarkMode] = useState(false); // Default to light mode
   const [isIndustrialTheme] = useState(true); // Enable industrial theme by default
 
   // Apply dark mode and industrial theme classes to document element
@@ -115,52 +115,6 @@ function App() {
 
   return (
     <div className={`app ${isDarkMode ? 'dark' : 'light'}`}>
-      {/* App Header */}
-      <div className="app-header">
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          color: 'white',
-          fontFamily: "'Inter', sans-serif"
-        }}>
-          {/* Logo Mark */}
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '8px',
-            background: 'rgba(0, 255, 255, 0.1)',
-            border: '1px solid rgba(0, 255, 255, 0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 0 10px rgba(0, 255, 255, 0.1)'
-          }}>
-            <div style={{
-              width: '8px',
-              height: '8px',
-              background: '#00ffff',
-              borderRadius: '50%',
-              boxShadow: '0 0 8px #00ffff'
-            }} />
-          </div>
-
-          {/* Brand Name */}
-          <span style={{
-            fontSize: '1.1rem',
-            fontWeight: 800,
-            letterSpacing: '1.5px',
-            textTransform: 'uppercase',
-            background: 'linear-gradient(90deg, #fff, #ccc)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            textShadow: '0 0 15px rgba(255,255,255,0.2)'
-          }}>
-            Boston Visit
-          </span>
-        </div>
-      </div>
-
       {/* Left Panel: Results + Itinerary Side by Side */}
       <div className="app-left-panel">
         <ItineraryPanel

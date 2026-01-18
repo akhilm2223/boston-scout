@@ -116,9 +116,16 @@ app.get('/api/places/filter', async (req, res) => {
 // Get place by ID
 app.get('/api/places/:id', async (req, res) => {
   try {
+    const id = req.params.id;
+    
+    // Validate ObjectId format (24 hex characters)
+    if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
+      return res.status(400).json({ error: 'Invalid place ID format' });
+    }
+    
     const { ObjectId } = await import('mongodb');
     const place = await placesCollection.findOne({
-      _id: new ObjectId(req.params.id)
+      _id: new ObjectId(id)
     });
 
     if (!place) {
@@ -652,14 +659,24 @@ app.get('/api/places/infinite', async (req, res) => {
 
     // Build final query - combine search filter and cursor
     if (cursor) {
-      const { ObjectId } = await import('mongodb');
-      const cursorFilter = { _id: { $gt: new ObjectId(cursor) } };
+      const cleanCursor = String(cursor).trim();
       
-      if (searchFilter) {
-        // Combine search and cursor with $and
-        matchQuery = { $and: [searchFilter, cursorFilter] };
+      // Validate cursor is a valid ObjectId format (24 hex characters)
+      if (cleanCursor && /^[0-9a-fA-F]{24}$/.test(cleanCursor)) {
+        const { ObjectId } = await import('mongodb');
+        const cursorFilter = { _id: { $gt: new ObjectId(cleanCursor) } };
+        
+        if (searchFilter) {
+          matchQuery = { $and: [searchFilter, cursorFilter] };
+        } else {
+          matchQuery = cursorFilter;
+        }
       } else {
-        matchQuery = cursorFilter;
+        // Invalid cursor - just use search filter if present
+        console.log('[Infinite] Invalid cursor format, ignoring:', cleanCursor?.substring(0, 30));
+        if (searchFilter) {
+          matchQuery = searchFilter;
+        }
       }
     } else if (searchFilter) {
       matchQuery = searchFilter;

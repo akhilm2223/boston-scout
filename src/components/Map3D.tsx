@@ -210,7 +210,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
 
     const mapInstance = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/light-v11',
+      style: isDarkMode ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/light-v11',
       center: [-71.0589, 42.3601], // Boston downtown
       zoom: 14, // Better zoom to see places/events (was 15)
       pitch: 60, // Reduced for better visibility (was 65)

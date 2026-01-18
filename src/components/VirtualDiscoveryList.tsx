@@ -1,31 +1,31 @@
 import { useState, useCallback, useRef, useEffect, CSSProperties } from 'react';
 import { List, ListImperativeAPI } from 'react-window';
 import VibePlaceCard from './VibePlaceCard';
-import type { VectorSearchResult } from '../types/vector';
+import type { VectorSearchResult, EventSearchResult, UnifiedSearchResult } from '../types/vector';
 import './VirtualDiscoveryList.css';
 
 const ITEM_HEIGHT = 120;
 const OVERSCAN_COUNT = 5;
 
 export interface VirtualDiscoveryListProps {
-  items: VectorSearchResult[];
+  items: UnifiedSearchResult[];
   hasMore: boolean;
   isLoading: boolean;
   onLoadMore: () => Promise<void>;
   addedIds: Set<string>;
-  onAddPlace: (place: VectorSearchResult) => void;
-  onSkipPlace: (place: VectorSearchResult) => void;
-  onPlaceClick: (place: VectorSearchResult) => void;
+  onAddItem: (item: UnifiedSearchResult) => void;
+  onSkipItem: (item: UnifiedSearchResult) => void;
+  onItemClick: (item: UnifiedSearchResult) => void;
   height?: number;
   emptyMessage?: string;
 }
 
 interface RowProps {
-  items: VectorSearchResult[];
+  items: UnifiedSearchResult[];
   addedIds: Set<string>;
-  onAddPlace: (place: VectorSearchResult) => void;
-  onSkipPlace: (place: VectorSearchResult) => void;
-  onPlaceClick: (place: VectorSearchResult) => void;
+  onAddItem: (item: UnifiedSearchResult) => void;
+  onSkipItem: (item: UnifiedSearchResult) => void;
+  onItemClick: (item: UnifiedSearchResult) => void;
 }
 
 interface RowComponentProps extends RowProps {
@@ -39,13 +39,94 @@ interface RowComponentProps extends RowProps {
 }
 
 /**
+ * Event card component for rendering events
+ */
+function EventCard({ 
+  event, 
+  isAdded, 
+  onAdd, 
+  onSkip, 
+  onClick, 
+  style 
+}: { 
+  event: EventSearchResult;
+  isAdded: boolean;
+  onAdd: () => void;
+  onSkip: () => void;
+  onClick: () => void;
+  style: CSSProperties;
+}) {
+  const formatDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  return (
+    <div 
+      className={`vibe-card event-card ${isAdded ? 'added' : ''}`} 
+      style={style}
+      onClick={onClick}
+    >
+      <div className="vibe-card-content">
+        <div className="vibe-card-header">
+          <span className="event-badge">🎭 Event</span>
+          {event.category && (
+            <span className="event-category">{event.category}</span>
+          )}
+        </div>
+        <h3 className="vibe-card-title">{event.title}</h3>
+        <div className="vibe-card-meta">
+          <span className="event-date">📅 {formatDate(event.start_time)}</span>
+          <span className="event-venue">📍 {event.venue.name}</span>
+        </div>
+        {event.price && (
+          <span className="event-price">{event.price}</span>
+        )}
+      </div>
+      <div className="vibe-card-actions">
+        {!isAdded ? (
+          <>
+            <button 
+              className="action-btn add-btn" 
+              onClick={(e) => { e.stopPropagation(); onAdd(); }}
+              title="Add to itinerary"
+            >
+              +
+            </button>
+            <button 
+              className="action-btn skip-btn" 
+              onClick={(e) => { e.stopPropagation(); onSkip(); }}
+              title="Skip"
+            >
+              ×
+            </button>
+          </>
+        ) : (
+          <span className="added-badge">✓ Added</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Row component for virtual list
  */
-function Row({ index, style, items, addedIds, onAddPlace, onSkipPlace, onPlaceClick }: RowComponentProps) {
-  const place = items[index];
+function Row({ index, style, items, addedIds, onAddItem, onSkipItem, onItemClick }: RowComponentProps) {
+  const item = items[index];
 
   // Loading placeholder
-  if (!place) {
+  if (!item) {
     return (
       <div style={style} className="virtual-list-loading-row">
         <div className="loading-skeleton">
@@ -60,14 +141,31 @@ function Row({ index, style, items, addedIds, onAddPlace, onSkipPlace, onPlaceCl
     );
   }
 
+  // Render event card for events
+  if (item.type === 'event') {
+    return (
+      <EventCard
+        key={item._id}
+        event={item as EventSearchResult}
+        isAdded={addedIds.has(item._id)}
+        onAdd={() => onAddItem(item)}
+        onSkip={() => onSkipItem(item)}
+        onClick={() => onItemClick(item)}
+        style={style}
+      />
+    );
+  }
+
+  // Render place card for places
+  const place = item as VectorSearchResult;
   return (
     <VibePlaceCard
       key={place._id}
       place={place}
       isAdded={addedIds.has(place._id)}
-      onAdd={onAddPlace}
-      onSkip={onSkipPlace}
-      onClick={onPlaceClick}
+      onAdd={() => onAddItem(item)}
+      onSkip={() => onSkipItem(item)}
+      onClick={() => onItemClick(item)}
       style={style}
     />
   );
@@ -83,9 +181,9 @@ export default function VirtualDiscoveryList({
   isLoading,
   onLoadMore,
   addedIds,
-  onAddPlace,
-  onSkipPlace,
-  onPlaceClick,
+  onAddItem,
+  onSkipItem,
+  onItemClick,
   height,
   emptyMessage = 'Search for places to discover'
 }: VirtualDiscoveryListProps) {
@@ -133,9 +231,9 @@ export default function VirtualDiscoveryList({
   const rowProps: RowProps = {
     items,
     addedIds,
-    onAddPlace,
-    onSkipPlace,
-    onPlaceClick
+    onAddItem,
+    onSkipItem,
+    onItemClick
   };
 
   // Empty state

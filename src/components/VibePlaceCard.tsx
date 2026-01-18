@@ -6,9 +6,9 @@ import './VibePlaceCard.css';
 export interface VibePlaceCardProps {
   place: VectorSearchResult;
   isAdded: boolean;
-  onAdd: (place: VectorSearchResult) => void;
-  onSkip: (place: VectorSearchResult) => void;
-  onClick: (place: VectorSearchResult) => void;
+  onAdd: ((place: VectorSearchResult) => void) | (() => void);
+  onSkip: ((place: VectorSearchResult) => void) | (() => void);
+  onClick: ((place: VectorSearchResult) => void) | (() => void);
   style?: React.CSSProperties;
 }
 
@@ -43,7 +43,8 @@ function VibePlaceCard({
   const handleAddClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isAdded) {
-      onAdd(place);
+      // Support both callback styles
+      (onAdd as () => void)();
     }
   };
 
@@ -57,7 +58,7 @@ function VibePlaceCard({
         ...style,
         '--card-image': `url(${imageUrl})`
       } as React.CSSProperties}
-      onClick={() => onClick(place)}
+      onClick={() => (onClick as () => void)()}
     >
       {/* Image Section (40% width) */}
       <div className="card-image-section">
