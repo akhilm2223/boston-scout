@@ -152,7 +152,7 @@ export default function ItineraryPanel({
 
   const handleStopClick = (stop: ItineraryEvent) => {
     setSelectedStop(stop.id);
-    onLocationClick([stop.location.lat, stop.location.lng], stop.name);
+    onLocationClick([stop.location.lng, stop.location.lat], stop.name);
   };
 
   const totalSteps = 4;
@@ -326,8 +326,7 @@ export default function ItineraryPanel({
             {/* Itinerary Pane - Right Side */}
             <ItineraryPane
               items={items}
-              selectedStop={selectedStop}
-              onStopClick={handleStopClick}
+              onLocationClick={onLocationClick}
               onRemoveEvent={onRemoveEvent}
               draggedIndex={draggedIndex}
               onDragStart={handleDragStart}

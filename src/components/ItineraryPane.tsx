@@ -3,20 +3,18 @@ import { ItineraryEvent } from '../types';
 import './ItineraryPane.css';
 
 interface ItineraryPaneProps {
-  items: ItineraryEvent[];
-  selectedStop: string | null;
-  onStopClick: (stop: ItineraryEvent) => void;
-  onRemoveEvent: (eventId: string) => void;
-  draggedIndex: number | null;
-  onDragStart: (index: number) => void;
-  onDragOver: (e: React.DragEvent, index: number) => void;
-  onDragEnd: () => void;
+	items: ItineraryEvent[];
+	onLocationClick: (location: [number, number], name: string) => void;
+	onRemoveEvent: (eventId: string) => void;
+	draggedIndex: number | null;
+	onDragStart: (index: number) => void;
+	onDragOver: (e: React.DragEvent, index: number) => void;
+	onDragEnd: () => void;
 }
 
 export default function ItineraryPane({
   items,
-  selectedStop,
-  onStopClick,
+  onLocationClick,
   onRemoveEvent,
   draggedIndex,
   onDragStart,
@@ -64,8 +62,8 @@ export default function ItineraryPane({
           {items.map((stop, index) => (
             <div
               key={stop.id}
-              className={`itinerary-item ${selectedStop === stop.id ? "selected" : ""} ${draggedIndex === index ? "dragging" : ""} ${newItemIds.has(stop.id) ? "new-item" : ""}`}
-              onClick={() => onStopClick(stop)}
+              className={`itinerary-item ${draggedIndex === index ? "dragging" : ""} ${newItemIds.has(stop.id) ? "new-item" : ""}`}
+              onClick={() => onLocationClick([stop.location.lng, stop.location.lat], stop.name)}
               draggable
               onDragStart={() => onDragStart(index)}
               onDragOver={(e) => onDragOver(e, index)}

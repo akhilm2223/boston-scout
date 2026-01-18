@@ -2593,29 +2593,55 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       easing: (t) => t * (2 - t), // Ease out quad for smooth deceleration
     });
 
-    // Building lift effect - highlight buildings near the selected location
-    // Create a temporary pulse effect by adjusting building properties
-    const pulseBuildings = () => {
-      if (!map.current?.getLayer('buildings-3d')) return;
-
-      // Temporarily increase vertical scale for dramatic effect
-      map.current.setPaintProperty('buildings-3d', 'fill-extrusion-vertical-scale', 1.15);
-
-      // Add cyan underglow to all buildings briefly
-      map.current.setPaintProperty('buildings-3d', 'fill-extrusion-flood-light-color', '#00d4aa');
-      map.current.setPaintProperty('buildings-3d', 'fill-extrusion-flood-light-intensity', 0.4);
-
-      // Reset after animation
-      setTimeout(() => {
-        if (map.current?.getLayer('buildings-3d')) {
-          map.current.setPaintProperty('buildings-3d', 'fill-extrusion-vertical-scale', 1.0);
-          // Return to normal flood light (will be overridden by animation loop)
+    // Add a temporary marker at the selected location
+    if (map.current.getSource('selected-location-marker')) {
+      (map.current.getSource('selected-location-marker') as mapboxgl.GeoJSONSource).setData({
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: location
+          },
+          properties: {
+            name: selectedLocation.name
+          }
+        }]
+      });
+    } else {
+      map.current.addSource('selected-location-marker', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: [{
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: location
+            },
+            properties: {
+              name: selectedLocation.name
+            }
+          }]
         }
-      }, 1500);
-    };
+      });
 
-    // Trigger building lift after a short delay (when camera is moving)
-    setTimeout(pulseBuildings, 500);
+      // Add marker layer if it doesn't exist
+      if (!map.current.getLayer('selected-location-marker-core')) {
+
+        map.current.addLayer({
+          id: 'selected-location-marker-core',
+          type: 'circle',
+          source: 'selected-location-marker',
+          paint: {
+            'circle-radius': 3,
+            'circle-color': '#000000',
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-width': 2
+          }
+        });
+      }
+    }
 
   }, [selectedLocation, isLoaded]);
 
