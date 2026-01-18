@@ -945,24 +945,63 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         data: { type: 'FeatureCollection', features: [] },
       });
 
-      // Walking paths (dotted lines)
+      // Walking paths (dotted green lines with glow)
+      mapInstance.addLayer({
+        id: 'itinerary-walking-glow',
+        type: 'line',
+        source: 'itinerary-routes',
+        filter: ['==', ['get', 'mode'], 'walking'],
+        layout: {
+          'visibility': 'none',
+          'line-cap': 'round',
+          'line-join': 'round',
+        },
+        paint: {
+          'line-color': '#10b981',
+          'line-width': 8,
+          'line-blur': 4,
+          'line-opacity': 0.4,
+        },
+      });
+
       mapInstance.addLayer({
         id: 'itinerary-walking',
         type: 'line',
         source: 'itinerary-routes',
         filter: ['==', ['get', 'mode'], 'walking'],
         layout: {
-          'visibility': 'none', // Hidden until itinerary is loaded
+          'visibility': 'none',
+          'line-cap': 'round',
+          'line-join': 'round',
         },
         paint: {
           'line-color': '#10b981', // Green for walking
           'line-width': 4,
           'line-dasharray': [2, 2],
-          'line-opacity': 0.9,
+          'line-opacity': 1,
         },
       });
 
-      // Transit paths (solid lines, color-coded by route)
+      // Transit paths glow (for emphasis)
+      mapInstance.addLayer({
+        id: 'itinerary-transit-glow',
+        type: 'line',
+        source: 'itinerary-routes',
+        filter: ['!=', ['get', 'mode'], 'walking'],
+        layout: {
+          'visibility': 'none',
+          'line-cap': 'round',
+          'line-join': 'round',
+        },
+        paint: {
+          'line-color': ['get', 'routeColor'],
+          'line-width': 12,
+          'line-blur': 4,
+          'line-opacity': 0.5,
+        },
+      });
+
+      // Transit paths (solid lines, color-coded by MBTA line)
       mapInstance.addLayer({
         id: 'itinerary-transit',
         type: 'line',
@@ -970,15 +1009,18 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         filter: ['!=', ['get', 'mode'], 'walking'],
         layout: {
           'visibility': 'none',
+          'line-cap': 'round',
+          'line-join': 'round',
         },
         paint: {
           'line-color': ['get', 'routeColor'],
-          'line-width': 5,
-          'line-opacity': 0.95,
+          'line-width': 6,
+          'line-opacity': 1,
         },
       });
 
-      // Stop markers (numbered circles)
+      // Stop markers (colored by type)
+      // Colors: hotel=gold, meal=orange, visit=blue
       mapInstance.addLayer({
         id: 'itinerary-stops-circle',
         type: 'circle',
@@ -987,15 +1029,63 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
           'visibility': 'none',
         },
         paint: {
-          'circle-radius': 18,
-          'circle-color': '#3b82f6', // Blue for stops
+          'circle-radius': 20,
+          'circle-color': [
+            'match',
+            ['get', 'type'],
+            'hotel', '#f59e0b', // Gold for hotel
+            'meal', '#f97316', // Orange for meals/restaurants
+            'activity', '#3b82f6', // Blue for activities
+            'visit', '#8b5cf6', // Purple for visits
+            '#3b82f6' // Default blue
+          ],
           'circle-stroke-color': '#ffffff',
           'circle-stroke-width': 3,
           'circle-opacity': 0.95,
         },
       });
 
-      // Stop numbers
+      // Stop icons/emojis based on type
+      mapInstance.addLayer({
+        id: 'itinerary-stops-icon',
+        type: 'symbol',
+        source: 'itinerary-stops',
+        layout: {
+          'visibility': 'none',
+          'text-field': [
+            'match',
+            ['get', 'type'],
+            'hotel', '🏨',
+            'meal', '🍽️',
+            'visit', '📍',
+            'activity', '🎯',
+            '📍'
+          ],
+          'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+          'text-size': 16,
+          'text-allow-overlap': true,
+        },
+        paint: {
+          'text-color': '#ffffff',
+        },
+      });
+
+      // Stop number badge (small circle with number)
+      mapInstance.addLayer({
+        id: 'itinerary-stops-number-bg',
+        type: 'circle',
+        source: 'itinerary-stops',
+        layout: {
+          'visibility': 'none',
+        },
+        paint: {
+          'circle-radius': 10,
+          'circle-color': '#000000',
+          'circle-translate': [15, -15], // Offset to top-right
+          'circle-opacity': 0.9,
+        },
+      });
+
       mapInstance.addLayer({
         id: 'itinerary-stops-number',
         type: 'symbol',
@@ -1004,34 +1094,201 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
           'visibility': 'none',
           'text-field': ['get', 'stopNumber'],
           'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
-          'text-size': 14,
+          'text-size': 12,
           'text-allow-overlap': true,
+          'text-offset': [1.2, -1.2], // Match the circle offset
         },
         paint: {
           'text-color': '#ffffff',
         },
       });
 
-      // Stop labels (show at higher zoom)
+      // Stop labels with time
       mapInstance.addLayer({
         id: 'itinerary-stops-label',
         type: 'symbol',
         source: 'itinerary-stops',
         layout: {
           'visibility': 'none',
-          'text-field': ['get', 'name'],
+          'text-field': ['concat', ['get', 'time'], ' - ', ['get', 'name']],
           'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
-          'text-size': 12,
-          'text-offset': [0, 2.2],
+          'text-size': 11,
+          'text-offset': [0, 2.5],
           'text-anchor': 'top',
-          'text-max-width': 12,
+          'text-max-width': 15,
         },
         paint: {
           'text-color': '#ffffff',
           'text-halo-color': '#000000',
           'text-halo-width': 2,
         },
-        minzoom: 12,
+        minzoom: 11,
+      });
+
+      // ================================================
+      // ITINERARY STOP CLICK HANDLER
+      // ================================================
+      mapInstance.on('click', 'itinerary-stops-circle', async (e) => {
+        if (!e.features || e.features.length === 0) return;
+
+        const props = e.features[0].properties;
+        if (!props) return;
+        const coordinates = (e.features[0].geometry as any).coordinates.slice();
+
+        // Get stop details
+        const stopName = props.name || 'Stop';
+        const stopTime = props.time || '';
+        const stopType = props.type || 'visit';
+        const stopNumber = props.stopNumber || '';
+
+        // Determine icon and color based on type
+        let typeIcon = '📍';
+        let typeColor = '#8b5cf6';
+        let typeLabel = 'Visit';
+        
+        if (stopType === 'hotel') {
+          typeIcon = '🏨';
+          typeColor = '#f59e0b';
+          typeLabel = 'Hotel';
+        } else if (stopType === 'meal') {
+          typeIcon = '🍽️';
+          typeColor = '#f97316';
+          typeLabel = 'Meal';
+        } else if (stopType === 'activity') {
+          typeIcon = '🎯';
+          typeColor = '#3b82f6';
+          typeLabel = 'Activity';
+        }
+
+        // Get photo and details from stop properties (populated from original items)
+        let photoUrl = '';
+        let placeRating = props.rating || 0;
+        let placeAddress = props.address || '';
+        let placeCategories = props.categories || '';
+        
+        // Extract place name from description (remove "Visit ", "Lunch at ", etc.)
+        const cleanName = stopName
+          .replace(/^(visit|lunch at|dinner at|breakfast at|arrive at|leave|return to|walk to|exploring|enjoying|checking in at|checking out from|leaving|starting the day from|visiting)\s+/i, '')
+          .trim();
+
+        // Use photo from stop properties if available
+        if (props.photoName) {
+          photoUrl = props.photoName.startsWith('http') ? props.photoName :
+            props.photoName.startsWith('places/') ?
+              `https://places.googleapis.com/v1/${props.photoName}/media?maxHeightPx=400&maxWidthPx=400&key=${GOOGLE_MAPS_API_KEY}` :
+              `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${props.photoName}&key=${GOOGLE_MAPS_API_KEY}`;
+        }
+
+        // If no photo from properties, try to find from places source
+        if (!photoUrl) {
+          try {
+            const features = mapInstance.querySourceFeatures('places');
+            const matchingPlace = features.find((f: any) => {
+              const placeName = (f.properties?.name || '').toLowerCase();
+              const searchName = cleanName.toLowerCase();
+              return placeName.includes(searchName) || searchName.includes(placeName) ||
+                     placeName.split(' ').some((word: string) => searchName.includes(word) && word.length > 3);
+            });
+
+            if (matchingPlace?.properties) {
+              const p = matchingPlace.properties;
+              if (!placeRating) placeRating = p.rating || 0;
+              if (!placeAddress) placeAddress = p.address || '';
+              if (!placeCategories) placeCategories = p.categories || '';
+              
+              if (p.photoName) {
+                photoUrl = p.photoName.startsWith('http') ? p.photoName :
+                  p.photoName.startsWith('places/') ?
+                    `https://places.googleapis.com/v1/${p.photoName}/media?maxHeightPx=400&maxWidthPx=400&key=${GOOGLE_MAPS_API_KEY}` :
+                    `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${p.photoName}&key=${GOOGLE_MAPS_API_KEY}`;
+              }
+            }
+          } catch (err) {
+            console.log('[Itinerary] Could not find matching place for:', cleanName);
+          }
+        }
+
+        // Build rating stars
+        let starsHTML = '';
+        if (placeRating > 0) {
+          const fullStars = Math.floor(placeRating);
+          const hasHalfStar = placeRating % 1 >= 0.5;
+          for (let i = 0; i < 5; i++) {
+            if (i < fullStars) {
+              starsHTML += '<span style="color: #000;">★</span>';
+            } else if (i === fullStars && hasHalfStar) {
+              starsHTML += '<span style="color: #000;">⯨</span>';
+            } else {
+              starsHTML += '<span style="color: #d1d5db;">★</span>';
+            }
+          }
+        }
+
+        // Build popup HTML
+        const photoHTML = photoUrl ?
+          `<div style="width: 100%; height: 160px; background: linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%); position: relative; overflow: hidden;">
+            <img src="${photoUrl}" 
+                 style="width: 100%; height: 100%; object-fit: cover;"
+                 onerror="this.parentElement.style.background='linear-gradient(135deg, ${typeColor} 0%, ${typeColor}99 100%)'; this.style.display='none';" />
+            ${placeRating > 0 ? `<div style="position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); padding: 5px 10px; border-radius: 6px; font-size: 12px; color: #000; font-weight: 700;">
+              ${starsHTML} <span style="margin-left: 4px;">${placeRating.toFixed(1)}</span>
+            </div>` : ''}
+            <div style="position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); padding: 4px 8px; border-radius: 20px; font-size: 11px; color: #fff; font-weight: 600;">
+              Stop #${stopNumber}
+            </div>
+          </div>` :
+          `<div style="width: 100%; height: 120px; background: linear-gradient(135deg, ${typeColor} 0%, ${typeColor}99 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
+            <span style="font-size: 48px;">${typeIcon}</span>
+            <div style="position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); padding: 4px 8px; border-radius: 20px; font-size: 11px; color: #fff; font-weight: 600;">
+              Stop #${stopNumber}
+            </div>
+          </div>`;
+
+        const popupHTML = `
+          <div class="itinerary-popup" style="min-width: 280px; max-width: 320px; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; overflow: hidden; border-radius: 12px;">
+            ${photoHTML}
+            <div style="padding: 14px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                <span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: ${typeColor}; color: #fff; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase;">
+                  ${typeIcon} ${typeLabel}
+                </span>
+                ${stopTime ? `<span style="font-size: 13px; color: #000; font-weight: 600;">⏰ ${stopTime}</span>` : ''}
+              </div>
+              
+              <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 700; color: #000; line-height: 1.3;">
+                ${cleanName}
+              </h3>
+              
+              ${placeCategories ? `<p style="margin: 0 0 8px 0; font-size: 11px; color: #666;">
+                ${placeCategories}
+              </p>` : ''}
+              
+              ${placeAddress ? `<div style="display: flex; align-items: start; gap: 6px;">
+                <span style="font-size: 12px;">📍</span>
+                <span style="font-size: 11px; color: #6b7280; line-height: 1.4;">${placeAddress}</span>
+              </div>` : ''}
+            </div>
+          </div>
+        `;
+
+        new mapboxgl.Popup({ 
+          maxWidth: '340px', 
+          className: 'itinerary-popup-container',
+          closeButton: true,
+          closeOnClick: true
+        })
+          .setLngLat(coordinates)
+          .setHTML(popupHTML)
+          .addTo(mapInstance);
+      });
+
+      // Cursor change on itinerary stop hover
+      mapInstance.on('mouseenter', 'itinerary-stops-circle', () => {
+        mapInstance.getCanvas().style.cursor = 'pointer';
+      });
+
+      mapInstance.on('mouseleave', 'itinerary-stops-circle', () => {
+        mapInstance.getCanvas().style.cursor = '';
       });
 
       // Landmark click interaction
@@ -2020,8 +2277,9 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         });
 
         // Hide itinerary layers
-        ['itinerary-walking', 'itinerary-transit', 'itinerary-stops-circle', 
-         'itinerary-stops-number', 'itinerary-stops-label'].forEach(layer => {
+        ['itinerary-walking-glow', 'itinerary-walking', 'itinerary-transit-glow', 
+         'itinerary-transit', 'itinerary-stops-circle', 'itinerary-stops-icon', 
+         'itinerary-stops-number-bg', 'itinerary-stops-number', 'itinerary-stops-label'].forEach(layer => {
           if (map.current?.getLayer(layer)) {
             map.current.setLayoutProperty(layer, 'visibility', 'none');
           }
@@ -2242,7 +2500,30 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       const currentLocation = findLocation(step);
 
       if (currentLocation) {
-        // Add stop marker
+        // Try to find matching original item for photo and details
+        let photoName = '';
+        let rating = 0;
+        let address = '';
+        let categories = '';
+        
+        const stepDesc = (step.description || '').toLowerCase();
+        if (itineraryRouteData.originalItems) {
+          const matchingItem = itineraryRouteData.originalItems.find((item: any) => {
+            const itemName = (item.name || '').toLowerCase();
+            return stepDesc.includes(itemName) || itemName.split(' ').some((w: string) => 
+              w.length > 3 && stepDesc.includes(w)
+            );
+          });
+          
+          if (matchingItem) {
+            photoName = matchingItem.photo_name || matchingItem.photoName || '';
+            rating = matchingItem.rating || 0;
+            address = matchingItem.address || '';
+            categories = matchingItem.categories || matchingItem.vibe || '';
+          }
+        }
+
+        // Add stop marker with enhanced data
         stopFeatures.push({
           type: 'Feature',
           geometry: {
@@ -2253,7 +2534,11 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
             stopNumber: stopNumber++,
             name: step.description || '',
             time: step.time || '',
-            type: step.type
+            type: step.type,
+            photoName,
+            rating,
+            address,
+            categories
           }
         });
 
@@ -2337,8 +2622,9 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       });
 
       // Show itinerary layers
-      ['itinerary-walking', 'itinerary-transit', 'itinerary-stops-circle', 
-       'itinerary-stops-number', 'itinerary-stops-label'].forEach(layer => {
+      ['itinerary-walking-glow', 'itinerary-walking', 'itinerary-transit-glow', 
+       'itinerary-transit', 'itinerary-stops-circle', 'itinerary-stops-icon', 
+       'itinerary-stops-number-bg', 'itinerary-stops-number', 'itinerary-stops-label'].forEach(layer => {
         if (mapInstance.getLayer(layer)) {
           mapInstance.setLayoutProperty(layer, 'visibility', 'visible');
         }
@@ -3330,25 +3616,26 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
           bottom: '20px',
           left: '50%',
           transform: 'translateX(-50%)',
-          background: 'rgba(0, 0, 0, 0.85)',
+          background: 'rgba(0, 0, 0, 0.9)',
           backdropFilter: 'blur(10px)',
-          borderRadius: '12px',
-          padding: '12px 16px',
+          borderRadius: '16px',
+          padding: '16px 20px',
           display: 'flex',
-          alignItems: 'center',
+          flexDirection: 'column',
           gap: '12px',
           zIndex: 1000,
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          minWidth: '320px',
         }}>
+          {/* Day selector for multi-day trips */}
           {itineraryRouteData.isMultiDay && itineraryRouteData.days && (
-            <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{
                 color: '#fff',
                 fontSize: '14px',
                 fontWeight: '600',
-                marginRight: '8px',
-              }}>Itinerary:</span>
+              }}>📅 Day:</span>
               {itineraryRouteData.days.map((day: any, index: number) => (
                 <button
                   key={index}
@@ -3358,9 +3645,9 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
                     color: '#fff',
                     border: 'none',
                     borderRadius: '8px',
-                    padding: '8px 16px',
+                    padding: '6px 14px',
                     cursor: 'pointer',
-                    fontSize: '13px',
+                    fontSize: '12px',
                     fontWeight: '600',
                     transition: 'all 0.2s ease',
                   }}
@@ -3375,18 +3662,48 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
                     }
                   }}
                 >
-                  Day {day.day}
+                  {day.day}
                 </button>
               ))}
-            </>
+            </div>
           )}
-          {!itineraryRouteData.isMultiDay && (
-            <span style={{
-              color: '#fff',
-              fontSize: '14px',
-              fontWeight: '600',
-            }}>🗺️ Itinerary Route Shown</span>
-          )}
+          
+          {/* Legend */}
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '12px',
+            borderTop: itineraryRouteData.isMultiDay ? '1px solid rgba(255,255,255,0.1)' : 'none',
+            paddingTop: itineraryRouteData.isMultiDay ? '12px' : '0',
+          }}>
+            {/* Stops legend */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '14px' }}>🏨</span>
+              <span style={{ color: '#f59e0b', fontSize: '11px', fontWeight: '500' }}>Hotel</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '14px' }}>🍽️</span>
+              <span style={{ color: '#f97316', fontSize: '11px', fontWeight: '500' }}>Meal</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '14px' }}>📍</span>
+              <span style={{ color: '#8b5cf6', fontSize: '11px', fontWeight: '500' }}>Visit</span>
+            </div>
+            
+            {/* Routes legend */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ width: '20px', height: '4px', background: '#10b981', borderRadius: '2px' }}></div>
+              <span style={{ color: '#10b981', fontSize: '11px', fontWeight: '500' }}>Walk</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ width: '20px', height: '4px', background: '#da291c', borderRadius: '2px' }}></div>
+              <span style={{ color: '#da291c', fontSize: '11px', fontWeight: '500' }}>Red Line</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ width: '20px', height: '4px', background: '#00a651', borderRadius: '2px' }}></div>
+              <span style={{ color: '#00a651', fontSize: '11px', fontWeight: '500' }}>Green Line</span>
+            </div>
+          </div>
         </div>
       )}
 
