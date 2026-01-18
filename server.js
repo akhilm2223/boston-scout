@@ -97,6 +97,41 @@ app.get('/api/landmarks', async (req, res) => {
   }
 });
 
+// Get hotels (optimized for fast loading)
+app.get('/api/hotels', async (req, res) => {
+  try {
+    const hotelsCollection = db.collection('boston-hotels');
+    const hotels = await hotelsCollection
+      .find({})
+      .project({
+        name: 1,
+        address: 1,
+        lat: 1,
+        lng: 1,
+        rating: 1,
+        user_rating_count: 1,
+        price_level: 1,
+        photo_name: 1
+      })
+      .sort({ rating: -1, user_rating_count: -1 })
+      .limit(50)
+      .toArray();
+
+    console.log(`[Hotels] Loaded ${hotels.length} hotels from boston-hotels collection`);
+
+    // Map fields for frontend compatibility
+    const formattedHotels = hotels.map(h => ({
+      ...h,
+      location: { lat: h.lat, lng: h.lng }
+    }));
+
+    res.json(formattedHotels);
+  } catch (error) {
+    console.error('Error fetching hotels:', error);
+    res.status(500).json({ error: 'Failed to fetch hotels' });
+  }
+});
+
 // Get places by filter
 app.get('/api/places/filter', async (req, res) => {
   try {
@@ -852,7 +887,7 @@ app.post('/api/events/vibe-search', async (req, res) => {
     if (!results) {
       console.log('[Events] Using text search for:', query);
       const searchTerms = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
-      
+
       let findQuery = {};
       if (searchTerms.length > 0) {
         const regexPattern = searchTerms.join('|');
@@ -872,7 +907,7 @@ app.post('/api/events/vibe-search', async (req, res) => {
         .limit(limit)
         .project({ embedding: 0 })
         .toArray();
-      
+
       console.log(`[Events] Text search returned ${results.length} results`);
     }
 

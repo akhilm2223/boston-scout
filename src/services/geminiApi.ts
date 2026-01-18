@@ -160,3 +160,141 @@ export async function generatePlaceInsightHTML(
     </div>
   `;
 }
+
+// Optimization for Itinerary
+import { ItineraryEvent } from '../types/types';
+
+export async function optimizeItinerary(itinerary: ItineraryEvent[], tripDates?: any, startLocation?: { lat: number; lng: number }, selectedHotel?: any): Promise<string> {
+  if (!GEMINI_API_KEY) {
+    return JSON.stringify({ error: "Gemini API key is missing. Please check your .env file." });
+  }
+
+  // Calculate trip duration
+  let numDays = 1;
+  if (tripDates?.startDate && tripDates?.endDate) {
+    const start = new Date(tripDates.startDate);
+    const end = new Date(tripDates.endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    numDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  }
+
+  const isMultiDay = numDays > 1;
+
+  const items = itinerary.map(item => ({
+    name: item.name,
+    location: item.location,
+    duration: item.duration,
+    category: item.category,
+    fixedTime: item.time
+  }));
+
+  const hotelInfo = selectedHotel ? `
+    Hotel: ${selectedHotel.name}
+    Location: ${selectedHotel.location.lat}, ${selectedHotel.location.lng}
+    Address: ${selectedHotel.address || 'N/A'}
+  ` : 'No hotel selected';
+
+  const prompt = `
+    You are a public-transit itinerary optimization engine.
+
+    Trip Duration: ${numDays} day${numDays > 1 ? 's' : ''}
+    Trip Dates: ${tripDates ? `${tripDates.startDate} to ${tripDates.endDate}` : 'Not specified'}
+
+    Given a list of locations with latitude, longitude, and time constraints:
+    - Events have fixed start times
+    - Restaurants have time windows
+    - Landmarks are flexible
+
+    Start Location: ${startLocation ? `${startLocation.lat}, ${startLocation.lng} (User's Current Location)` : 'Not specified'}
+
+    ${selectedHotel ? hotelInfo : ''}
+
+    Here are the locations to visit:
+    ${JSON.stringify(items, null, 2)}
+
+    ${isMultiDay ? `CREATE A ${numDays}-DAY ITINERARY:
+
+    CRITICAL HOTEL RULES (MUST FOLLOW):
+    - EVERY day MUST start at the hotel
+    - EVERY day MUST end at the hotel
+    - First activity of each day: "Leave hotel" or "Check out from hotel"
+    - Last activity of each day: "Return to hotel" or "Check in at hotel"
+    - Example Day 1: Hotel → Transit → Activity → ... → Dinner → Transit → Hotel
+    - Example Day 2: Hotel → Transit → Activity → ... → Dinner → Transit → Hotel
+    
+    - Organize activities across ${numDays} days
+    - Balance activities evenly across days
+    - Include realistic travel times from/to hotel` : 'CREATE A SINGLE-DAY ITINERARY:'}
+
+    Your task:
+    1. Determine the optimal visit order to minimize total travel time.
+    2. STRICTLY use public transportation (MBTA bus, subway, commuter rail) for distances over 0.5 miles.
+    3. MEAL TIME RULES:
+       - Lunch: 11:30 AM - 2:00 PM
+       - Dinner: 6:00 PM - 9:00 PM
+    4. LOGICAL FLOW:
+       ${isMultiDay ? `
+       - DAY START: Hotel → Travel to first location
+       - DAY FLOW: Morning → Lunch → Afternoon → Dinner → Evening
+       - DAY END: Travel back to hotel → Arrive at hotel
+       ` : `
+       - START from ${selectedHotel ? 'hotel' : startLocation ? 'start location' : 'central location'}
+       - Order: Travel → Morning → Lunch → Afternoon → Dinner → Evening
+       `}
+    5. Respect all time constraints.
+
+    ${isMultiDay ? `Return JSON with "days" array. Each day has:
+    - "day": number
+    - "date": string
+    - "schedule": array of steps` : 'Return JSON with "schedule" array of steps.'}
+
+    Each step:
+    - "time": string (arrival time or boarding time for transit)
+    - "description": string
+    - "type": "transit" | "activity" | "meal" | "hotel"
+    - "transport_mode": "walking" | "bus" | "train" | "subway" | null
+    - "route_info": string | null (e.g., "Red Line", "Bus 57")
+    - "boarding_time": string | null (REQUIRED for bus/train/subway - exact time to board, e.g., "09:15")
+    - "duration": string | null
+    - "details": string
+
+    IMPORTANT TRANSIT RULES:
+    - For bus/train/subway steps, ALWAYS include "boarding_time" with the exact time to catch the transit
+    - Example: {"time": "09:15", "description": "Board Red Line to Downtown", "type": "transit", "transport_mode": "subway", "route_info": "Red Line", "boarding_time": "09:15", "duration": "12 mins"}
+    - For walking, boarding_time should be null
+
+    Return STRICT JSON ONLY.
+  `;
+
+  try {
+    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.2, // Lower temperature for more deterministic/structured output
+          response_mime_type: "application/json"
+        }
+      })
+    });
+
+    if (!response.ok) {
+      console.error('Gemini API error:', response.status, await response.text());
+      return JSON.stringify({ error: "Failed to generate itinerary. Please try again later." });
+    }
+
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify({ error: "No response generated." });
+
+  } catch (error) {
+    console.error("Error organizing itinerary:", error);
+    return JSON.stringify({ error: "Failed to generate itinerary. Please check your connection." });
+  }
+}

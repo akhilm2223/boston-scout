@@ -12,9 +12,9 @@ const client = apiKey ? new ElevenLabsClient({ apiKey }) : null;
 // Default voice settings - can be customized
 const VOICE_SETTINGS = {
     stability: 0.5,
-    similarity_boost: 0.75,
+    similarityBoost: 0.75,
     style: 0.0,
-    use_speaker_boost: true
+    useSpeakerBoost: true
 };
 
 // Default voice ID - using Rachel (a clear, friendly female voice)
@@ -24,7 +24,7 @@ const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; // Rachel
 export interface TextToSpeechOptions {
     voice?: string;
     stability?: number;
-    similarity_boost?: number;
+    similarityBoost?: number;
 }
 
 /**
@@ -36,9 +36,11 @@ export async function textToSpeech(
     options: TextToSpeechOptions = {}
 ): Promise<string | null> {
     if (!client) {
-        console.error('ElevenLabs client not initialized. Check your API key.');
+        console.error('❌ ElevenLabs client not initialized. VITE_ELEVENLABS_API_KEY is likely missing from .env');
         return null;
     }
+
+    console.log('🎤 Generating speech for:', text.substring(0, 30) + '...');
 
     if (!text || text.trim().length === 0) {
         console.warn('Empty text provided for text-to-speech');
@@ -49,28 +51,40 @@ export async function textToSpeech(
         const voiceId = options.voice || DEFAULT_VOICE_ID;
 
         // Generate audio using streaming API
-        const audioStream = await client.textToSpeech.convert(voiceId, {
+        const response: any = await client.textToSpeech.convert(voiceId, {
             text,
-            model_id: 'eleven_turbo_v2_5', // Fast, low-latency model
-            voice_settings: {
+            modelId: 'eleven_turbo_v2_5', // Fast, low-latency model
+            voiceSettings: {
                 stability: options.stability ?? VOICE_SETTINGS.stability,
-                similarity_boost: options.similarity_boost ?? VOICE_SETTINGS.similarity_boost,
+                similarityBoost: options.similarityBoost ?? VOICE_SETTINGS.similarityBoost,
                 style: VOICE_SETTINGS.style,
-                use_speaker_boost: VOICE_SETTINGS.use_speaker_boost
+                useSpeakerBoost: VOICE_SETTINGS.useSpeakerBoost
             }
         });
 
-        // Convert stream to blob
-        const chunks: Uint8Array[] = [];
-        for await (const chunk of audioStream) {
-            chunks.push(chunk);
+        // Convert stream to blob - robust browser stream handling
+        const chunks: any[] = [];
+
+        // Handle both async iterator and standard reader
+        if (typeof response[Symbol.asyncIterator] === 'function') {
+            for await (const chunk of response) {
+                chunks.push(chunk);
+            }
+        } else {
+            const reader = response.getReader();
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                if (value) chunks.push(value);
+            }
         }
 
         // Combine chunks into a single blob
-        const audioBlob = new Blob(chunks as any[], { type: 'audio/mpeg' });
+        const audioBlob = new Blob(chunks, { type: 'audio/mpeg' });
 
         // Create URL for the audio blob
         const audioUrl = URL.createObjectURL(audioBlob);
+        console.log('✅ Speech generated successfully');
 
         return audioUrl;
     } catch (error) {

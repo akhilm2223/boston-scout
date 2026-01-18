@@ -3,6 +3,7 @@ import '@/components/ItineraryPanel.css';
 import "@/App.css";
 import StepOne from './StepOne';
 import StepTwo from './StepTwo';
+import StepFour from './StepFour';
 import { ItineraryEvent } from '../types';
 import DiscoveryPane, { DiscoveryPaneRef } from './DiscoveryPane';
 import ItineraryPane from './ItineraryPane';
@@ -236,9 +237,9 @@ export default function ItineraryPanel({
                 ) : (
                   <div>
                     <p className="text-cyan-400 text-sm">
-                      {voiceOnboarding.voiceState === 'listening' 
+                      {voiceOnboarding.voiceState === 'listening'
                         ? '🎤 Listening... speak now!'
-                        : voiceOnboarding.isPushToTalk 
+                        : voiceOnboarding.isPushToTalk
                           ? '🎤 Release space when done'
                           : '⌨️ Hold SPACE to speak'}
                     </p>
@@ -247,7 +248,7 @@ export default function ItineraryPanel({
                     </p>
                   </div>
                 )}
-                
+
                 {voiceOnboarding.currentTranscript && (
                   <p className="text-cyan-300 text-xs italic truncate mt-1">
                     "{voiceOnboarding.currentTranscript}"
@@ -266,7 +267,7 @@ export default function ItineraryPanel({
                     {voiceOnboarding.progress.current}/{voiceOnboarding.progress.total}
                   </span>
                 ) : (
-                  <button 
+                  <button
                     onClick={() => voiceOnboarding.stop()}
                     className="text-gray-400 hover:text-white text-xs px-2 py-1 rounded hover:bg-white/10"
                   >
@@ -334,6 +335,13 @@ export default function ItineraryPanel({
               onDragEnd={handleDragEnd}
             />
           </div>
+        )}
+        {currentStep === 4 && (
+          <StepFour
+            items={items}
+            tripDates={tripDates}
+            onBack={handlePrev}
+          />
         )}
       </div>
 
