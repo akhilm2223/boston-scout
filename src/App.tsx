@@ -97,6 +97,9 @@ function App() {
     timestamp: number;
   } | null>(null);
 
+  // Itinerary route data for map visualization
+  const [itineraryRouteData, setItineraryRouteData] = useState<any>(null);
+
   const handleDisplayStart = useCallback((mode: 'voice' | 'chat') => {
     setShowWelcome(false);
 
@@ -155,6 +158,7 @@ function App() {
           onVoiceOnboardingComplete={() => setVoiceOnboardingActive(false)}
           setLayerVisibility={handleSetLayerVisibility}
           onMapControl={handleMapControl}
+          onItineraryRouteUpdate={setItineraryRouteData}
         />
       </div>
 
@@ -167,6 +171,7 @@ function App() {
             isDarkMode={isDarkMode}
             setIsDarkMode={setIsDarkMode}
             mapCommand={mapCommand}
+            itineraryRouteData={itineraryRouteData}
           />
         </MapErrorBoundary>
       </div>

@@ -32,6 +32,7 @@ interface ItineraryPanelProps {
   onVoiceOnboardingComplete: () => void;
   setLayerVisibility: (layer: 'places' | 'events' | 'landmarks', visible: boolean) => void;
   onMapControl?: (action: 'zoom_in' | 'zoom_out' | 'fly_to', location?: string) => void;
+  onItineraryRouteUpdate?: (routeData: any) => void;
 }
 
 export default function ItineraryPanel({
@@ -46,7 +47,8 @@ export default function ItineraryPanel({
   voiceOnboardingActive,
   onVoiceOnboardingComplete,
   setLayerVisibility,
-  onMapControl
+  onMapControl,
+  onItineraryRouteUpdate
 }: ItineraryPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStop, setSelectedStop] = useState<string | null>(null);
@@ -340,6 +342,7 @@ export default function ItineraryPanel({
             items={items}
             tripDates={tripDates}
             onBack={handlePrev}
+            onItineraryRouteUpdate={onItineraryRouteUpdate}
           />
         )}
       </div>

@@ -6,9 +6,10 @@ interface StepFourProps {
     items: ItineraryEvent[];
     tripDates: any;
     onBack?: () => void;
+    onItineraryRouteUpdate?: (routeData: any) => void;
 }
 
-export default function StepFour({ items, tripDates, onBack }: StepFourProps) {
+export default function StepFour({ items, tripDates, onBack, onItineraryRouteUpdate }: StepFourProps) {
     const [optimizedPlan, setOptimizedPlan] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | undefined>(undefined);
@@ -87,6 +88,51 @@ export default function StepFour({ items, tripDates, onBack }: StepFourProps) {
     useEffect(() => {
         generatePlan();
     }, [items, tripDates, userLocation, selectedHotel]);
+
+    // Parse and send itinerary data to map for visualization
+    useEffect(() => {
+        if (!optimizedPlan || loading || !onItineraryRouteUpdate) return;
+
+        try {
+            const parsed = JSON.parse(optimizedPlan);
+            if (parsed.error) {
+                onItineraryRouteUpdate(null);
+                return;
+            }
+
+            // Build a lookup map from item names to their coordinates
+            const itemLocations: Map<string, { lat: number; lng: number }> = new Map();
+            items.forEach(item => {
+                // Store by name (lowercase for easier matching)
+                itemLocations.set(item.name.toLowerCase(), item.location);
+                // Also try shorter versions (first word, etc.)
+                const words = item.name.split(/[\s,]+/);
+                if (words.length > 1) {
+                    itemLocations.set(words[0].toLowerCase(), item.location);
+                }
+            });
+
+            // Add hotel location if available
+            if (selectedHotel?.latitude && selectedHotel?.longitude) {
+                itemLocations.set('hotel', { lat: selectedHotel.latitude, lng: selectedHotel.longitude });
+                itemLocations.set(selectedHotel.name?.toLowerCase() || 'hotel', { lat: selectedHotel.latitude, lng: selectedHotel.longitude });
+            }
+
+            // Send parsed itinerary data with hotel and trip info
+            onItineraryRouteUpdate({
+                days: parsed.days || null,
+                schedule: parsed.schedule || null,
+                hotel: selectedHotel,
+                tripDates,
+                isMultiDay: !!parsed.days,
+                itemLocations: Object.fromEntries(itemLocations), // Pass location lookup
+                originalItems: items // Pass original items with coordinates
+            });
+        } catch (e) {
+            console.error('Failed to parse itinerary:', e);
+            onItineraryRouteUpdate(null);
+        }
+    }, [optimizedPlan, loading, selectedHotel, tripDates, onItineraryRouteUpdate, items]);
 
     return (
         <div className="w-full h-full p-4 text-(--text-primary) flex flex-col overflow-hidden">

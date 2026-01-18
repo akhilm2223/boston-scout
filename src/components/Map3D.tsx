@@ -27,6 +27,7 @@ interface Map3DProps {
     location?: string;
     timestamp: number;
   } | null;
+  itineraryRouteData?: any;
 }
 
 // Boston downtown center
@@ -111,7 +112,7 @@ function lerpColor(c1: string, c2: string, t: number): string {
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 }
 
-export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDarkMode, mapCommand }: Map3DProps) {
+export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDarkMode, mapCommand, itineraryRouteData }: Map3DProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -137,6 +138,8 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
   const [showLandmarks, setShowLandmarks] = useState(false);
   const [is3DMode, setIs3DMode] = useState(true);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [selectedItineraryDay, setSelectedItineraryDay] = useState(0);
+  const [showItinerary, setShowItinerary] = useState(false);
 
   // Generate vascular light trail segments with speed-linked pulse
   const generateLightTrails = useCallback((
@@ -924,6 +927,111 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
           'text-halo-width': 1.5,
         },
         minzoom: 14,
+      });
+
+      // ===========================================
+      // ITINERARY ROUTE VISUALIZATION
+      // ===========================================
+
+      // Source for itinerary routes (walking and transit paths)
+      mapInstance.addSource('itinerary-routes', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      // Source for itinerary stop markers
+      mapInstance.addSource('itinerary-stops', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      // Walking paths (dotted lines)
+      mapInstance.addLayer({
+        id: 'itinerary-walking',
+        type: 'line',
+        source: 'itinerary-routes',
+        filter: ['==', ['get', 'mode'], 'walking'],
+        layout: {
+          'visibility': 'none', // Hidden until itinerary is loaded
+        },
+        paint: {
+          'line-color': '#10b981', // Green for walking
+          'line-width': 4,
+          'line-dasharray': [2, 2],
+          'line-opacity': 0.9,
+        },
+      });
+
+      // Transit paths (solid lines, color-coded by route)
+      mapInstance.addLayer({
+        id: 'itinerary-transit',
+        type: 'line',
+        source: 'itinerary-routes',
+        filter: ['!=', ['get', 'mode'], 'walking'],
+        layout: {
+          'visibility': 'none',
+        },
+        paint: {
+          'line-color': ['get', 'routeColor'],
+          'line-width': 5,
+          'line-opacity': 0.95,
+        },
+      });
+
+      // Stop markers (numbered circles)
+      mapInstance.addLayer({
+        id: 'itinerary-stops-circle',
+        type: 'circle',
+        source: 'itinerary-stops',
+        layout: {
+          'visibility': 'none',
+        },
+        paint: {
+          'circle-radius': 18,
+          'circle-color': '#3b82f6', // Blue for stops
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 3,
+          'circle-opacity': 0.95,
+        },
+      });
+
+      // Stop numbers
+      mapInstance.addLayer({
+        id: 'itinerary-stops-number',
+        type: 'symbol',
+        source: 'itinerary-stops',
+        layout: {
+          'visibility': 'none',
+          'text-field': ['get', 'stopNumber'],
+          'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+          'text-size': 14,
+          'text-allow-overlap': true,
+        },
+        paint: {
+          'text-color': '#ffffff',
+        },
+      });
+
+      // Stop labels (show at higher zoom)
+      mapInstance.addLayer({
+        id: 'itinerary-stops-label',
+        type: 'symbol',
+        source: 'itinerary-stops',
+        layout: {
+          'visibility': 'none',
+          'text-field': ['get', 'name'],
+          'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+          'text-size': 12,
+          'text-offset': [0, 2.2],
+          'text-anchor': 'top',
+          'text-max-width': 12,
+        },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': '#000000',
+          'text-halo-width': 2,
+        },
+        minzoom: 12,
       });
 
       // Landmark click interaction
@@ -1857,6 +1965,403 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       }
     });
   }, [showLandmarks, isLoaded]);
+
+  // Itinerary visualization
+  useEffect(() => {
+    if (!map.current || !isLoaded || !itineraryRouteData) {
+      // Clear itinerary if no data
+      if (map.current?.getSource('itinerary-routes')) {
+        (map.current.getSource('itinerary-routes') as mapboxgl.GeoJSONSource).setData({
+          type: 'FeatureCollection',
+          features: []
+        });
+      }
+      if (map.current?.getSource('itinerary-stops')) {
+        (map.current.getSource('itinerary-stops') as mapboxgl.GeoJSONSource).setData({
+          type: 'FeatureCollection',
+          features: []
+        });
+      }
+
+      // Restore visibility of all layers when itinerary is cleared
+      if (map.current && isLoaded) {
+        // Restore transit (if showTransitLayers was true)
+        const transitVis = showTransitLayers ? 'visible' : 'none';
+        ['trails-glow', 'trails-core', 'trails-head', 'stops-glow', 'stops-marker', 
+         'glow-zone', 'trains-core', 'vehicles-glow', 'mbta-subway-3d', 
+         'ferry-body', 'ferry-label'].forEach(layer => {
+          if (map.current?.getLayer(layer)) {
+            map.current.setLayoutProperty(layer, 'visibility', transitVis);
+          }
+        });
+
+        // Restore places (if showPlaces was true)
+        const placesVis = showPlaces ? 'visible' : 'none';
+        ['places-glow', 'places-marker', 'places-label'].forEach(layer => {
+          if (map.current?.getLayer(layer)) {
+            map.current.setLayoutProperty(layer, 'visibility', placesVis);
+          }
+        });
+
+        // Restore events (if showEvents was true)
+        const eventsVis = showEvents ? 'visible' : 'none';
+        ['events-glow', 'events-marker', 'events-label'].forEach(layer => {
+          if (map.current?.getLayer(layer)) {
+            map.current.setLayoutProperty(layer, 'visibility', eventsVis);
+          }
+        });
+
+        // Restore landmarks (if showLandmarks was true)
+        const landmarksVis = showLandmarks ? 'visible' : 'none';
+        ['landmarks-glow', 'landmarks-marker', 'landmarks-label'].forEach(layer => {
+          if (map.current?.getLayer(layer)) {
+            map.current.setLayoutProperty(layer, 'visibility', landmarksVis);
+          }
+        });
+
+        // Hide itinerary layers
+        ['itinerary-walking', 'itinerary-transit', 'itinerary-stops-circle', 
+         'itinerary-stops-number', 'itinerary-stops-label'].forEach(layer => {
+          if (map.current?.getLayer(layer)) {
+            map.current.setLayoutProperty(layer, 'visibility', 'none');
+          }
+        });
+
+        console.log('[Itinerary] Cleared - restoring other layers');
+      }
+
+      setShowItinerary(false);
+      return;
+    }
+
+    const mapInstance = map.current;
+
+    // MBTA line colors
+    const transitColors: { [key: string]: string } = {
+      'red line': '#da291c',
+      'red': '#da291c',
+      'blue line': '#003da5',
+      'blue': '#003da5',
+      'orange line': '#ff7a00',
+      'orange': '#ff7a00',
+      'green line': '#00a651',
+      'green': '#00a651',
+      'green-b': '#00a651',
+      'green-c': '#00a651',
+      'green-d': '#00a651',
+      'green-e': '#00a651',
+      'silver line': '#7c8ca3',
+      'silver': '#7c8ca3',
+      'commuter rail': '#56236E',
+      'commuter': '#56236E',
+    };
+
+    // Get the active day schedule
+    const schedule = itineraryRouteData.isMultiDay && itineraryRouteData.days
+      ? itineraryRouteData.days[selectedItineraryDay]?.schedule
+      : itineraryRouteData.schedule;
+
+    if (!schedule || !Array.isArray(schedule)) return;
+
+    // Build location lookup from itemLocations and originalItems
+    const locationLookup: Map<string, [number, number]> = new Map();
+    
+    // Add hotel location - check multiple possible formats
+    const hotel = itineraryRouteData.hotel;
+    if (hotel) {
+      let hotelCoords: [number, number] | null = null;
+      
+      if (hotel.latitude && hotel.longitude) {
+        hotelCoords = [hotel.longitude, hotel.latitude];
+      } else if (hotel.lat && hotel.lng) {
+        hotelCoords = [hotel.lng, hotel.lat];
+      } else if (hotel.location?.lat && hotel.location?.lng) {
+        hotelCoords = [hotel.location.lng, hotel.location.lat];
+      }
+      
+      if (hotelCoords) {
+        locationLookup.set('hotel', hotelCoords);
+        locationLookup.set('lark', hotelCoords);
+        locationLookup.set('lark hotels', hotelCoords);
+        if (hotel.name) {
+          locationLookup.set(hotel.name.toLowerCase(), hotelCoords);
+          // Add partial matches for hotel name
+          const hotelWords = hotel.name.toLowerCase().split(/[\s,]+/);
+          hotelWords.forEach((word: string) => {
+            if (word.length > 3) locationLookup.set(word, hotelCoords!);
+          });
+        }
+        console.log('[Itinerary] Hotel location set:', hotelCoords);
+      }
+    }
+
+    // Add original items with coordinates
+    if (itineraryRouteData.originalItems) {
+      itineraryRouteData.originalItems.forEach((item: any) => {
+        let coords: [number, number] | null = null;
+        
+        if (item.location?.lat && item.location?.lng) {
+          coords = [item.location.lng, item.location.lat];
+        } else if (item.latitude && item.longitude) {
+          coords = [item.longitude, item.latitude];
+        }
+        
+        if (coords) {
+          const nameLower = item.name.toLowerCase();
+          locationLookup.set(nameLower, coords);
+          
+          // Add multiple variants for better matching
+          // Remove common words and add parts
+          const cleanName = nameLower
+            .replace(/^(the|a|an)\s+/i, '')
+            .replace(/\s+(restaurant|cafe|bar|pub|grill|house|kitchen|tavern|bistro|eatery)$/i, '');
+          locationLookup.set(cleanName, coords);
+          
+          // Add individual significant words
+          const words = nameLower.split(/[\s\-,&]+/);
+          words.forEach((word: string) => {
+            if (word.length > 3 && !['the', 'and', 'for', 'with'].includes(word)) {
+              locationLookup.set(word, coords!);
+            }
+          });
+          
+          // Add first two words combined
+          if (words.length >= 2) {
+            locationLookup.set(words.slice(0, 2).join(' '), coords);
+          }
+          if (words.length >= 3) {
+            locationLookup.set(words.slice(0, 3).join(' '), coords);
+          }
+        }
+      });
+    }
+
+    // Helper function to find location from step description
+    const findLocation = (step: any): [number, number] | null => {
+      const description = step.description || '';
+      const details = step.details || '';
+      const descLower = description.toLowerCase();
+      const detailsLower = details.toLowerCase();
+      
+      // Check for hotel-related steps
+      if (descLower.includes('hotel') || descLower.includes('check in') || 
+          descLower.includes('check out') || descLower.includes('leave hotel') || 
+          descLower.includes('return to hotel') || descLower.includes('arriving back') ||
+          detailsLower.includes('hotel') || step.type === 'hotel') {
+        const hotelCoords = locationLookup.get('hotel');
+        if (hotelCoords) {
+          console.log('[Itinerary] Matched hotel step:', description);
+          return hotelCoords;
+        }
+      }
+
+      // Extract place name from description patterns
+      const extractPatterns = [
+        /(?:visit|walk to|lunch at|dinner at|breakfast at|arrive at|explore|at)\s+(.+)/i,
+        /(?:starting|arriving|from)\s+(?:the day from\s+)?(.+)/i,
+      ];
+
+      for (const pattern of extractPatterns) {
+        const match = description.match(pattern);
+        if (match) {
+          const placeName = match[1].toLowerCase().trim();
+          
+          // Try exact match first
+          if (locationLookup.has(placeName)) {
+            console.log('[Itinerary] Exact match:', placeName);
+            return locationLookup.get(placeName)!;
+          }
+          
+          // Try partial matching
+          for (const [name, coords] of locationLookup.entries()) {
+            if (placeName.includes(name) || name.includes(placeName)) {
+              console.log('[Itinerary] Partial match:', placeName, '->', name);
+              return coords;
+            }
+          }
+          
+          // Try word-by-word matching
+          const placeWords = placeName.split(/[\s\-,&]+/).filter((w: string) => w.length > 2);
+          for (const word of placeWords) {
+            if (locationLookup.has(word)) {
+              console.log('[Itinerary] Word match:', word);
+              return locationLookup.get(word)!;
+            }
+          }
+        }
+      }
+
+      // Fallback: try direct description matching
+      for (const [name, coords] of locationLookup.entries()) {
+        if (descLower.includes(name)) {
+          console.log('[Itinerary] Fallback match:', name);
+          return coords;
+        }
+      }
+
+      console.log('[Itinerary] No match found for:', description);
+      return null;
+    };
+
+    // Determine transit color from step
+    const getTransitColor = (step: any): string => {
+      const routeInfo = (step.route_info || step.description || '').toLowerCase();
+      
+      for (const [key, color] of Object.entries(transitColors)) {
+        if (routeInfo.includes(key)) {
+          return color;
+        }
+      }
+      
+      return '#3b82f6'; // Default blue for unknown transit
+    };
+
+    // Generate GeoJSON features for routes and stops
+    const routeFeatures: GeoJSON.Feature[] = [];
+    const stopFeatures: GeoJSON.Feature[] = [];
+    let stopNumber = 1;
+    let lastLocation: [number, number] | null = null;
+    let pendingTransit: { color: string; mode: string; routeInfo: string } | null = null;
+
+    console.log('[Itinerary] Processing schedule with', schedule.length, 'steps');
+    console.log('[Itinerary] Location lookup has', locationLookup.size, 'entries');
+
+    schedule.forEach((step: any, idx: number) => {
+      // Handle transit steps - store for next location connection
+      if (step.type === 'transit') {
+        const mode = step.transport_mode || 'walking';
+        const routeInfo = step.route_info || step.description || '';
+        const color = mode === 'walking' ? '#10b981' : getTransitColor(step);
+        
+        pendingTransit = { color, mode, routeInfo };
+        console.log('[Itinerary] Transit step:', mode, routeInfo, '-> color:', color);
+        return;
+      }
+
+      // Non-transit step - find location
+      const currentLocation = findLocation(step);
+
+      if (currentLocation) {
+        // Add stop marker
+        stopFeatures.push({
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: currentLocation
+          },
+          properties: {
+            stopNumber: stopNumber++,
+            name: step.description || '',
+            time: step.time || '',
+            type: step.type
+          }
+        });
+
+        // Add route line from last location
+        if (lastLocation) {
+          const isWalking = pendingTransit?.mode === 'walking' || !pendingTransit;
+          const routeColor = pendingTransit?.color || '#10b981';
+          
+          routeFeatures.push({
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: [lastLocation, currentLocation]
+            },
+            properties: {
+              mode: isWalking ? 'walking' : 'transit',
+              routeInfo: pendingTransit?.routeInfo || '',
+              routeColor: routeColor,
+              duration: '',
+              boardingTime: ''
+            }
+          });
+          
+          console.log('[Itinerary] Route:', isWalking ? 'walking' : pendingTransit?.routeInfo, 'color:', routeColor);
+        }
+
+        lastLocation = currentLocation;
+        pendingTransit = null; // Reset pending transit
+      }
+    });
+
+    // Update map sources
+    if (mapInstance.getSource('itinerary-routes')) {
+      (mapInstance.getSource('itinerary-routes') as mapboxgl.GeoJSONSource).setData({
+        type: 'FeatureCollection',
+        features: routeFeatures
+      });
+    }
+
+    if (mapInstance.getSource('itinerary-stops')) {
+      (mapInstance.getSource('itinerary-stops') as mapboxgl.GeoJSONSource).setData({
+        type: 'FeatureCollection',
+        features: stopFeatures
+      });
+    }
+
+    // Show itinerary layers
+    const hasItinerary = routeFeatures.length > 0 || stopFeatures.length > 0;
+    setShowItinerary(hasItinerary);
+
+    // When itinerary is active, hide all other layers to show ONLY the itinerary
+    if (hasItinerary) {
+      // Hide transit layers
+      ['trails-glow', 'trails-core', 'trails-head', 'stops-glow', 'stops-marker', 
+       'glow-zone', 'trains-core', 'vehicles-glow', 'mbta-subway-3d', 
+       'ferry-body', 'ferry-label'].forEach(layer => {
+        if (mapInstance.getLayer(layer)) {
+          mapInstance.setLayoutProperty(layer, 'visibility', 'none');
+        }
+      });
+
+      // Hide places/restaurants
+      ['places-glow', 'places-marker', 'places-label'].forEach(layer => {
+        if (mapInstance.getLayer(layer)) {
+          mapInstance.setLayoutProperty(layer, 'visibility', 'none');
+        }
+      });
+
+      // Hide events
+      ['events-glow', 'events-marker', 'events-label'].forEach(layer => {
+        if (mapInstance.getLayer(layer)) {
+          mapInstance.setLayoutProperty(layer, 'visibility', 'none');
+        }
+      });
+
+      // Hide landmarks
+      ['landmarks-glow', 'landmarks-marker', 'landmarks-label'].forEach(layer => {
+        if (mapInstance.getLayer(layer)) {
+          mapInstance.setLayoutProperty(layer, 'visibility', 'none');
+        }
+      });
+
+      // Show itinerary layers
+      ['itinerary-walking', 'itinerary-transit', 'itinerary-stops-circle', 
+       'itinerary-stops-number', 'itinerary-stops-label'].forEach(layer => {
+        if (mapInstance.getLayer(layer)) {
+          mapInstance.setLayoutProperty(layer, 'visibility', 'visible');
+        }
+      });
+
+      console.log('[Itinerary] All other layers hidden - showing ONLY itinerary');
+    }
+
+    console.log('[Itinerary] Visualization updated:', routeFeatures.length, 'routes,', stopFeatures.length, 'stops');
+
+    // Fit map to show all stops if there are any
+    if (stopFeatures.length > 0) {
+      const bounds = new mapboxgl.LngLatBounds();
+      stopFeatures.forEach((feature: any) => {
+        bounds.extend(feature.geometry.coordinates);
+      });
+      mapInstance.fitBounds(bounds, {
+        padding: 100,
+        duration: 1000,
+        maxZoom: 14
+      });
+    }
+  }, [itineraryRouteData, selectedItineraryDay, isLoaded]);
 
   // 2D/3D mode toggle
   useEffect(() => {
@@ -2817,6 +3322,73 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
           <span>Landmarks</span>
         </button>
       </div>
+
+      {/* Itinerary Controls - Show when itinerary data exists */}
+      {itineraryRouteData && (
+        <div className="itinerary-controls" style={{
+          position: 'absolute',
+          bottom: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(0, 0, 0, 0.85)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '12px',
+          padding: '12px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          zIndex: 1000,
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+        }}>
+          {itineraryRouteData.isMultiDay && itineraryRouteData.days && (
+            <>
+              <span style={{
+                color: '#fff',
+                fontSize: '14px',
+                fontWeight: '600',
+                marginRight: '8px',
+              }}>Itinerary:</span>
+              {itineraryRouteData.days.map((day: any, index: number) => (
+                <button
+                  key={index}
+                  onClick={() => setSelectedItineraryDay(index)}
+                  style={{
+                    background: selectedItineraryDay === index ? '#3b82f6' : 'rgba(255, 255, 255, 0.1)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '8px 16px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedItineraryDay !== index) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedItineraryDay !== index) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                    }
+                  }}
+                >
+                  Day {day.day}
+                </button>
+              ))}
+            </>
+          )}
+          {!itineraryRouteData.isMultiDay && (
+            <span style={{
+              color: '#fff',
+              fontSize: '14px',
+              fontWeight: '600',
+            }}>🗺️ Itinerary Route Shown</span>
+          )}
+        </div>
+      )}
 
       {/* View Mode Controls - Under Zoom */}
       <div className="view-mode-controls">
