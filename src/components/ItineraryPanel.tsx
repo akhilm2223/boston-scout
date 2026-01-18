@@ -4,7 +4,9 @@ import "@/App.css";
 import StepOne from './StepOne'; 
 import StepTwo from './StepTwo';
 import { ItineraryEvent } from '../types'; 
-import EventSearchPanel from './EventSearchPanel';
+import DiscoveryPane from './DiscoveryPane';
+import ItineraryPane from './ItineraryPane';
+import SearchBar from './SearchBar';
 import { TripDates, WalkingPreferences } from '../App';
 
 function validateStep(step: number, tripDates: TripDates): boolean {
@@ -55,10 +57,6 @@ export default function ItineraryPanel({
       setTimeout(() => setIsSearching(false), 1000);
     }
   }, [searchQuery]);
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleSearchSubmit();
-  };
 
   const handleStopClick = (stop: ItineraryEvent) => {
     setSelectedStop(stop.id);
@@ -132,116 +130,36 @@ export default function ItineraryPanel({
 				)}
 				{currentStep === 3 && (
 					<div className="dual-panel-container">
-						{/* Discovery Column (4-Card Grid) */}
-						<div className="discovery-column">
-							<EventSearchPanel
-								onAddToItinerary={handleAddToItinerary}
-								onLocationClick={onLocationClick}
-								activeSearchQuery={searchQuery}
-							/>
-						</div>
+						{/* Discovery Pane - Left Side */}
+						<DiscoveryPane
+							onAddToItinerary={handleAddToItinerary}
+							onLocationClick={onLocationClick}
+							activeSearchQuery={searchQuery}
+						/>
 
-						{/* Itinerary Column */}
-						<div className="itinerary-column">
-							<div className="column-header">
-								<h2>Your Itinerary</h2>
-							</div>
-							<div className="itinerary-panel-v2">
-								<div className="itinerary-list">
-									{items.map((stop, index) => (
-										<div
-											key={stop.id}
-											className={`itinerary-item ${selectedStop === stop.id ? "selected" : ""} ${draggedIndex === index ? "dragging" : ""}`}
-											onClick={() =>
-												handleStopClick(stop)
-											}
-											draggable
-											onDragStart={() =>
-												handleDragStart(index)
-											}
-											onDragOver={(e) =>
-												handleDragOver(e, index)
-											}
-											onDragEnd={handleDragEnd}
-										>
-											{/* Drag Handle */}
-											<div
-												className="drag-handle"
-												title="Drag to reorder"
-											>
-												<span className="grip-dot"></span>
-												<span className="grip-dot"></span>
-												<span className="grip-dot"></span>
-												<span className="grip-dot"></span>
-												<span className="grip-dot"></span>
-												<span className="grip-dot"></span>
-											</div>
-
-											{/* Item Content */}
-											<div className="item-content">
-												<span className="item-name">
-													{stop.name}
-												</span>
-												{stop.time && (
-													<span className="item-time">
-														{stop.time}
-													</span>
-												)}
-											</div>
-
-											{/* Remove Button */}
-											{onRemoveEvent && (
-												<button
-													className="remove-btn-v2"
-													onClick={(e) => {
-														e.stopPropagation();
-														onRemoveEvent(stop.id);
-													}}
-													title="Remove from itinerary"
-												>
-													×
-												</button>
-											)}
-										</div>
-									))}
-								</div>
-
-								{/* Footer */}
-								<div className="itinerary-footer">
-									<div className="item-count">
-										{items.length}{" "}
-										{items.length === 1
-											? "experience"
-											: "experiences"}
-									</div>
-								</div>
-							</div>
-						</div>
+						{/* Itinerary Pane - Right Side */}
+						<ItineraryPane
+							items={items}
+							selectedStop={selectedStop}
+							onStopClick={handleStopClick}
+							onRemoveEvent={onRemoveEvent}
+							draggedIndex={draggedIndex}
+							onDragStart={handleDragStart}
+							onDragOver={handleDragOver}
+							onDragEnd={handleDragEnd}
+						/>
 					</div>
 				)}
 			</div>
 
-			{/* Unified Search Bar - at bottom */}
+			{/* Search Bar - at bottom for Step 3 */}
 			{currentStep === 3 && (
-				<div className="global-search-container">
-					<div className="search-wrapper">
-						<input
-							type="text"
-							className="global-search-input"
-							placeholder="Ask for experiences... (e.g. 'romantic dinner' or 'jazz concert')"
-							value={searchQuery}
-							onChange={(e) => setSearchQuery(e.target.value)}
-							onKeyPress={handleKeyPress}
-						/>
-						<button
-							className="global-search-btn"
-							onClick={handleSearchSubmit}
-							disabled={isSearching}
-						>
-							{isSearching ? "..." : "→"}
-						</button>
-					</div>
-				</div>
+				<SearchBar
+					searchQuery={searchQuery}
+					onSearchQueryChange={setSearchQuery}
+					onSearchSubmit={handleSearchSubmit}
+					isSearching={isSearching}
+				/>
 			)}
 		</div>
   );

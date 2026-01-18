@@ -48,13 +48,13 @@ async function enrichImages() {
         console.log('✓ Connected to MongoDB');
 
         const db = client.db('boston_database');
-        const restaurants = db.collection('boston_restaurants');
+        const places = db.collection('boston_places');
         const events = db.collection('boston_events');
 
         // 1. Enrich Restaurants
         console.log('\n--- Enriching Restaurants ---');
         // Find those without photo_name or with empty string
-        const missingRestaurants = await restaurants.find({
+        const missingPlaces = await places.find({
             $or: [
                 { photo_name: { $exists: false } },
                 { photo_name: '' },
@@ -62,15 +62,15 @@ async function enrichImages() {
             ]
         }).toArray(); // Processing ALL records
 
-        console.log(`Found ${missingRestaurants.length} restaurants to process (FULL BATCH)`);
+        console.log(`Found ${missingPlaces.length} restaurants to process (FULL BATCH)`);
 
         let rUpdated = 0;
-        for (const r of missingRestaurants) {
-            console.log(`[${rUpdated + 1}/${missingRestaurants.length}] Searching for: ${r.businessname}...`);
+        for (const r of missingPlaces) {
+            console.log(`[${rUpdated + 1}/${missingPlaces.length}] Searching for: ${r.businessname}...`);
             const photoRef = await searchGooglePlace(r.businessname || r.name);
 
             if (photoRef) {
-                await restaurants.updateOne(
+                await places.updateOne(
                     { _id: r._id },
                     { $set: { photo_name: photoRef, photo_source: 'google_places_api' } }
                 );

@@ -24,12 +24,12 @@ async function connectDB() {
     console.log('✓ Connected to MongoDB');
 
     db = client.db('boston_database');
-    restaurantsCollection = db.collection('boston_restaurants');
+    placesCollection = db.collection('boston_places');
     eventsCollection = db.collection('boston_events');
 
-    const restaurantCount = await restaurantsCollection.countDocuments();
+    const placeCount = await placesCollection.countDocuments();
     const eventCount = await eventsCollection.countDocuments();
-    console.log(`✓ Found ${restaurantCount} restaurants`);
+    console.log(`✓ Found ${placeCount} places`);
     console.log(`✓ Found ${eventCount} events`);
   } catch (error) {
     console.error('MongoDB connection error:', error);
@@ -39,10 +39,10 @@ async function connectDB() {
 
 // API Routes
 
-// Get all restaurants
-app.get('/api/restaurants', async (req, res) => {
+// Get all places
+app.get('/api/places', async (req, res) => {
   try {
-    const restaurants = await restaurantsCollection
+    const places = await placesCollection
       .find({})
       .project({
         businessname: 1,
@@ -71,15 +71,15 @@ app.get('/api/restaurants', async (req, res) => {
       })
       .toArray();
 
-    res.json(restaurants);
+    res.json(places);
   } catch (error) {
-    console.error('Error fetching restaurants:', error);
-    res.status(500).json({ error: 'Failed to fetch restaurants' });
+    console.error('Error fetching places:', error);
+    res.status(500).json({ error: 'Failed to fetch places' });
   }
 });
 
-// Get restaurants by filter
-app.get('/api/restaurants/filter', async (req, res) => {
+// Get places by filter
+app.get('/api/places/filter', async (req, res) => {
   try {
     const { minRating, priceLevel, category, features } = req.query;
 
@@ -105,30 +105,30 @@ app.get('/api/restaurants/filter', async (req, res) => {
       });
     }
 
-    const restaurants = await restaurantsCollection.find(query).toArray();
-    res.json(restaurants);
+    const places = await placesCollection.find(query).toArray();
+    res.json(places);
   } catch (error) {
-    console.error('Error filtering restaurants:', error);
-    res.status(500).json({ error: 'Failed to filter restaurants' });
+    console.error('Error filtering places:', error);
+    res.status(500).json({ error: 'Failed to filter places' });
   }
 });
 
-// Get restaurant by ID
-app.get('/api/restaurants/:id', async (req, res) => {
+// Get place by ID
+app.get('/api/places/:id', async (req, res) => {
   try {
     const { ObjectId } = await import('mongodb');
-    const restaurant = await restaurantsCollection.findOne({
+    const place = await placesCollection.findOne({
       _id: new ObjectId(req.params.id)
     });
 
-    if (!restaurant) {
-      return res.status(404).json({ error: 'Restaurant not found' });
+    if (!place) {
+      return res.status(404).json({ error: 'Place not found' });
     }
 
-    res.json(restaurant);
+    res.json(place);
   } catch (error) {
-    console.error('Error fetching restaurant:', error);
-    res.status(500).json({ error: 'Failed to fetch restaurant' });
+    console.error('Error fetching place:', error);
+    res.status(500).json({ error: 'Failed to fetch place' });
   }
 });
 

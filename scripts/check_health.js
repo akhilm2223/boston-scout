@@ -22,7 +22,7 @@ async function checkHealth() {
         console.log('✓ Connected to MongoDB');
 
         const db = client.db('boston_database');
-        const restaurants = db.collection('boston_restaurants');
+        const restaurants = db.collection('boston_places');
         const events = db.collection('boston_events');
 
         // Check Restaurants (looking for photo_name)

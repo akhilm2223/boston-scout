@@ -15,7 +15,7 @@ npm run server
 
 This will:
 - Connect to MongoDB
-- Serve restaurant data from `boston_database.boston_restaurants`
+- Serve restaurant data from `boston_database.boston_places`
 - Run on `http://localhost:3000`
 
 ### 3. Start the Frontend (Vite Dev Server)
@@ -67,7 +67,7 @@ GET http://localhost:3000/api/restaurants
 
 ### Filter Restaurants
 ```
-GET http://localhost:3000/api/restaurants/filter?minRating=4.5&features=outdoor_seating,reservable
+GET http://localhost:3000/api/places/filter?minRating=4.5&features=outdoor_seating,reservable
 ```
 
 Parameters:
@@ -76,16 +76,16 @@ Parameters:
 - `category`: Category name (e.g., "Italian")
 - `features`: Comma-separated features (e.g., "dine_in,outdoor_seating")
 
-### Get Single Restaurant
+### Get Single Place
 ```
-GET http://localhost:3000/api/restaurants/:id
+GET http://localhost:3000/api/places/:id
 ```
 
 ## Database Info
 
 **MongoDB Cluster:** `boston_scout`
 **Database:** `boston_database`
-**Collection:** `boston_restaurants`
+**Collection:** `boston_places`
 **Total Restaurants:** 3,008
 
 Each restaurant has:
@@ -98,7 +98,7 @@ Each restaurant has:
 ## Troubleshooting
 
 ### Restaurants not showing?
-1. Check backend is running: `http://localhost:3000/api/restaurants`
+1. Check backend is running: `http://localhost:3000/api/places`
 2. Check browser console for errors
 3. Zoom in to level 13+ on the map
 
