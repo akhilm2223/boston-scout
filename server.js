@@ -725,7 +725,7 @@ app.post('/api/events/vibe-search', async (req, res) => {
   const startTime = Date.now();
 
   try {
-    const { query, limit = 20, filters = {} } = req.body;
+    const { query, limit = 50, filters = {} } = req.body;
 
     if (!query || query.trim().length === 0) {
       return res.status(400).json({ error: 'Search query is required' });
@@ -733,67 +733,88 @@ app.post('/api/events/vibe-search', async (req, res) => {
 
     const queryEmbedding = await getQueryEmbedding(query);
     let results;
+    let searchMethod = 'text';
 
     if (queryEmbedding) {
-      const pipeline = [
-        {
-          $vectorSearch: {
-            index: 'events_vibe_index',
-            path: 'embedding',
-            queryVector: queryEmbedding,
-            numCandidates: 100,
-            limit: limit
+      try {
+        const pipeline = [
+          {
+            $vectorSearch: {
+              index: 'events_vibe_index',
+              path: 'embedding',
+              queryVector: queryEmbedding,
+              numCandidates: 200,
+              limit: limit
+            }
+          },
+          {
+            $addFields: {
+              score: { $meta: 'vectorSearchScore' }
+            }
           }
-        },
-        {
-          $addFields: {
-            score: { $meta: 'vectorSearchScore' }
-          }
+        ];
+
+        // Date filter
+        if (filters.startDate) {
+          pipeline.push({
+            $match: { start_time: { $gte: filters.startDate } }
+          });
         }
-      ];
 
-      // Date filter
-      if (filters.startDate) {
-        pipeline.push({
-          $match: { start_time: { $gte: filters.startDate } }
-        });
+        // Category filter
+        if (filters.categories && filters.categories.length > 0) {
+          pipeline.push({
+            $match: {
+              categories: { $elemMatch: { $regex: filters.categories.join('|'), $options: 'i' } }
+            }
+          });
+        }
+
+        pipeline.push({ $project: { embedding: 0 } });
+
+        results = await eventsCollection.aggregate(pipeline).toArray();
+        searchMethod = 'vector';
+        console.log(`[Events] Vector search for "${query}" returned ${results.length} results`);
+      } catch (vectorErr) {
+        // Vector search failed (index might not exist), fallback to text search
+        console.warn('[Events] Vector search failed, falling back to text search:', vectorErr.message);
+        results = null;
       }
+    }
 
-      // Category filter
-      if (filters.categories && filters.categories.length > 0) {
-        pipeline.push({
-          $match: {
-            categories: { $elemMatch: { $regex: filters.categories.join('|'), $options: 'i' } }
-          }
-        });
-      }
-
-      pipeline.push({ $project: { embedding: 0 } });
-
-      results = await eventsCollection.aggregate(pipeline).toArray();
-    } else {
-      // Fallback to text search
-      console.log('Falling back to text search for events:', query);
+    // Fallback to text search if vector search failed or no embedding
+    if (!results) {
+      console.log('[Events] Using text search for:', query);
       const searchTerms = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
-      const regexPattern = searchTerms.join('|');
-
-      results = await eventsCollection
-        .find({
+      
+      let findQuery = {};
+      if (searchTerms.length > 0) {
+        const regexPattern = searchTerms.join('|');
+        findQuery = {
           $or: [
             { title: { $regex: regexPattern, $options: 'i' } },
             { description: { $regex: regexPattern, $options: 'i' } },
-            { 'venue.name': { $regex: regexPattern, $options: 'i' } }
+            { 'venue.name': { $regex: regexPattern, $options: 'i' } },
+            { category: { $regex: regexPattern, $options: 'i' } }
           ]
-        })
+        };
+      }
+
+      results = await eventsCollection
+        .find(findQuery)
+        .sort({ start_time: 1 }) // Sort by upcoming first
         .limit(limit)
         .project({ embedding: 0 })
         .toArray();
+      
+      console.log(`[Events] Text search returned ${results.length} results`);
     }
 
     res.json({
       results,
       query,
       count: results.length,
+      searchMethod,
       took_ms: Date.now() - startTime
     });
 
