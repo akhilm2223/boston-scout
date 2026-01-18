@@ -26,6 +26,7 @@ async function connectDB() {
     db = client.db('boston_database');
     placesCollection = db.collection('boston_places');
     eventsCollection = db.collection('boston_events');
+    const landmarksCollection = db.collection('boston_landmarks');
 
     const placeCount = await placesCollection.countDocuments();
     const eventCount = await eventsCollection.countDocuments();
@@ -78,6 +79,24 @@ app.get('/api/places', async (req, res) => {
   }
 });
 
+app.get('/api/landmarks', async (req, res) => {
+  try {
+    const landmarksCollection = db.collection('boston_landmarks');
+    const landmarks = await landmarksCollection
+      .find({})
+      .project({
+        embedding: 0
+      })
+      .toArray();
+
+    console.log(`[Landmarks] Loaded ${landmarks.length} landmarks from boston_landmarks collection`);
+    res.json(landmarks);
+  } catch (error) {
+    console.error('Error fetching landmarks:', error);
+    res.status(500).json({ error: 'Failed to fetch landmarks' });
+  }
+});
+
 // Get places by filter
 app.get('/api/places/filter', async (req, res) => {
   try {
@@ -117,12 +136,12 @@ app.get('/api/places/filter', async (req, res) => {
 app.get('/api/places/:id', async (req, res) => {
   try {
     const id = req.params.id;
-    
+
     // Validate ObjectId format (24 hex characters)
     if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
       return res.status(400).json({ error: 'Invalid place ID format' });
     }
-    
+
     const { ObjectId } = await import('mongodb');
     const place = await placesCollection.findOne({
       _id: new ObjectId(id)
@@ -458,27 +477,61 @@ app.post('/api/places/vibe-search', async (req, res) => {
   const startTime = Date.now();
 
   try {
-    const { query, limit = 10, filters = {} } = req.body;
+    const { query, limit = 10, filters = {}, placeType } = req.body;
 
     if (!query || query.trim().length === 0) {
       return res.status(400).json({ error: 'Search query is required' });
     }
 
-    // Get embedding for the query
+    // Define category filters for different place types
+    // Restaurants: any place with food/dining related categories
+    const restaurantKeywords = ['restaurant', 'food', 'dining', 'cafe', 'coffee', 'bakery', 'bar', 'pub', 'pizza', 'sushi', 'seafood', 'deli', 'brunch', 'breakfast', 'lunch', 'dinner', 'steak', 'bagel', 'dessert', 'ice cream', 'tea house', 'wine bar', 'night club', 'confectionery', 'butcher', 'grocery', 'supermarket', 'liquor', 'catering', 'meal'];
+    // Landmarks: non-food places like attractions, venues, hotels, etc.
+    const landmarkKeywords = ['stadium', 'arena', 'tourist attraction', 'hotel', 'lodging', 'hospital', 'sports complex', 'athletic field', 'sports activity', 'bowling', 'event venue', 'bed and breakfast', 'market', 'florist', 'corporate office', 'store'];
+
+    // Get embedding for the query  
     const queryEmbedding = await getQueryEmbedding(query);
 
     let results;
 
-    if (queryEmbedding) {
-      // Use vector search if embedding is available
+    if (placeType === 'landmark') {
+      const landmarksCollection = db.collection('boston_landmarks');
+      console.log(`[VibeSearch] Searching landmarks for: ${query}`);
+      const searchTerms = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+      const regexPattern = searchTerms.join('|');
+
+      const searchTarget = query.toLowerCase() === 'popular boston' || query.toLowerCase() === 'popular restaurant boston' ? {} : {
+        $or: [
+          { name: { $regex: regexPattern, $options: 'i' } },
+          { categories: { $regex: regexPattern, $options: 'i' } },
+          { primary_category: { $regex: regexPattern, $options: 'i' } }
+        ]
+      };
+
+      const rawLandmarks = await landmarksCollection
+        .find(searchTarget)
+        .sort({ rating: -1, user_rating_count: -1 })
+        .limit(limit)
+        .toArray();
+
+      // Map fields to match places schema for frontend compatibility
+      results = rawLandmarks.map(l => ({
+        ...l,
+        businessname: l.name,
+        latitude: l.lat?.toString(),
+        longitude: l.lng?.toString(),
+        type: 'place'
+      }));
+    } else if (queryEmbedding) {
+      // Use vector search if embedding is available for places
       const pipeline = [
         {
           $vectorSearch: {
             index: 'vibe_index',
             path: 'embedding',
             queryVector: queryEmbedding,
-            numCandidates: 100,
-            limit: limit
+            numCandidates: 150,
+            limit: limit * 3 // Fetch more to filter by type
           }
         },
         {
@@ -487,6 +540,16 @@ app.post('/api/places/vibe-search', async (req, res) => {
           }
         }
       ];
+
+      // Add placeType filter (only for restaurant or all)
+      if (placeType === 'restaurant') {
+        // Restaurants: places with food-related categories
+        pipeline.push({
+          $match: {
+            categories: { $elemMatch: { $regex: restaurantKeywords.join('|'), $options: 'i' } }
+          }
+        });
+      }
 
       // Add filters if provided
       if (filters.categories && filters.categories.length > 0) {
@@ -508,6 +571,9 @@ app.post('/api/places/vibe-search', async (req, res) => {
           $match: { price_level: { $lte: filters.maxPriceLevel } }
         });
       }
+
+      // Limit results after filtering
+      pipeline.push({ $limit: limit });
 
       // Project only needed fields
       pipeline.push({
@@ -660,12 +726,12 @@ app.get('/api/places/infinite', async (req, res) => {
     // Build final query - combine search filter and cursor
     if (cursor) {
       const cleanCursor = String(cursor).trim();
-      
+
       // Validate cursor is a valid ObjectId format (24 hex characters)
       if (cleanCursor && /^[0-9a-fA-F]{24}$/.test(cleanCursor)) {
         const { ObjectId } = await import('mongodb');
         const cursorFilter = { _id: { $gt: new ObjectId(cleanCursor) } };
-        
+
         if (searchFilter) {
           matchQuery = { $and: [searchFilter, cursorFilter] };
         } else {
@@ -959,34 +1025,34 @@ app.post('/api/search/unified', async (req, res) => {
     }
 
     const queryEmbedding = await getQueryEmbedding(query);
-    
+
     // Search all three collections in parallel
     const [places, events, reddit] = await Promise.all([
       // Places search
       queryEmbedding
         ? placesCollection.aggregate([
-            { $vectorSearch: { index: 'vibe_index', path: 'embedding', queryVector: queryEmbedding, numCandidates: 50, limit: limit } },
-            { $addFields: { score: { $meta: 'vectorSearchScore' }, type: 'place' } },
-            { $project: { embedding: 0 } }
-          ]).toArray()
+          { $vectorSearch: { index: 'vibe_index', path: 'embedding', queryVector: queryEmbedding, numCandidates: 50, limit: limit } },
+          { $addFields: { score: { $meta: 'vectorSearchScore' }, type: 'place' } },
+          { $project: { embedding: 0 } }
+        ]).toArray()
         : placesCollection.find({ businessname: { $regex: query, $options: 'i' } }).limit(limit).project({ embedding: 0 }).toArray().then(r => r.map(p => ({ ...p, type: 'place' }))),
-      
+
       // Events search
       queryEmbedding
         ? eventsCollection.aggregate([
-            { $vectorSearch: { index: 'events_vibe_index', path: 'embedding', queryVector: queryEmbedding, numCandidates: 50, limit: limit } },
-            { $addFields: { score: { $meta: 'vectorSearchScore' }, type: 'event' } },
-            { $project: { embedding: 0 } }
-          ]).toArray()
+          { $vectorSearch: { index: 'events_vibe_index', path: 'embedding', queryVector: queryEmbedding, numCandidates: 50, limit: limit } },
+          { $addFields: { score: { $meta: 'vectorSearchScore' }, type: 'event' } },
+          { $project: { embedding: 0 } }
+        ]).toArray()
         : eventsCollection.find({ title: { $regex: query, $options: 'i' } }).limit(limit).project({ embedding: 0 }).toArray().then(r => r.map(e => ({ ...e, type: 'event' }))),
-      
+
       // Reddit search
       queryEmbedding
         ? redditCollection.aggregate([
-            { $vectorSearch: { index: 'reddit_vibe_index', path: 'embedding', queryVector: queryEmbedding, numCandidates: 50, limit: limit } },
-            { $addFields: { score: { $meta: 'vectorSearchScore' }, type: 'reddit' } },
-            { $project: { embedding: 0 } }
-          ]).toArray()
+          { $vectorSearch: { index: 'reddit_vibe_index', path: 'embedding', queryVector: queryEmbedding, numCandidates: 50, limit: limit } },
+          { $addFields: { score: { $meta: 'vectorSearchScore' }, type: 'reddit' } },
+          { $project: { embedding: 0 } }
+        ]).toArray()
         : redditCollection.find({ title: { $regex: query, $options: 'i' } }).limit(limit).project({ embedding: 0 }).toArray().then(r => r.map(p => ({ ...p, type: 'reddit' })))
     ]);
 

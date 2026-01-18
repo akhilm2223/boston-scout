@@ -35,10 +35,25 @@ function VibePlaceCard({
   const priceLevel = formatPriceLevel(place.price_level);
   const categories = formatCategories(place.categories);
 
-  // Generate a placeholder image URL based on place name
-  const imageUrl = place.photo_name
-    ? `https://places.googleapis.com/v1/${place.photo_name}/media?maxWidthPx=400&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
-    : `https://source.unsplash.com/400x300/?restaurant,food,${encodeURIComponent(categories || 'dining')}`;
+  // Determine the best image URL
+  let imageUrl = '';
+  if (place.photo_name) {
+    if (place.photo_name.startsWith('http')) {
+      imageUrl = place.photo_name;
+    } else if (place.photo_name.startsWith('places/')) {
+      imageUrl = `https://places.googleapis.com/v1/${place.photo_name}/media?maxWidthPx=400&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
+    } else {
+      imageUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${place.photo_name}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
+    }
+  } else {
+    // Unsplash fallback based on category/type
+    const isLandmark = categories?.toLowerCase().includes('museum') ||
+      categories?.toLowerCase().includes('attraction') ||
+      categories?.toLowerCase().includes('park') ||
+      !categories;
+    const searchTerms = isLandmark ? 'landmark,boston,sightseeing' : 'restaurant,food,dining';
+    imageUrl = `https://source.unsplash.com/400x300/?${searchTerms},${encodeURIComponent(categories || '')}`;
+  }
 
   const handleAddClick = (e: React.MouseEvent) => {
     e.stopPropagation();

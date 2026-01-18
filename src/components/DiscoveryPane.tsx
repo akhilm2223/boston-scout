@@ -40,7 +40,7 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
 }, ref) => {
   // Track added place IDs
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
-  
+
   // Filter state
   const [showFilters, setShowFilters] = useState(false);
   const [minRating, setMinRating] = useState<number>(0);
@@ -59,9 +59,9 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
     searchType,
     setSearchType
   } = useVectorSearch({ debounceMs: 300, initialLimit: 20 });
-  
+
   // Check if any filter is active
-  const hasActiveFilters = minRating > 0 || priceLevel !== null || searchType !== 'places';
+  const hasActiveFilters = minRating > 0 || priceLevel !== null || searchType !== 'transit';
 
   // City pulse hook for hero options
   const {
@@ -91,12 +91,12 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
     }
   }, [activeSearchQuery, query, setQuery]);
 
-  // Initial load - search for popular places
+  // Initial load - only search if not transit mode
   useEffect(() => {
-    if (results.length === 0 && !query) {
+    if (results.length === 0 && !query && searchType !== 'transit') {
       search('popular restaurant boston');
     }
-  }, [results.length, query, search]);
+  }, [results.length, query, search, searchType]);
 
   // Filter results client-side
   const filteredResults = results.filter(item => {
@@ -187,7 +187,7 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
       {/* Column Header with Filter Toggle */}
       <div className="column-header">
         <h2>Discover</h2>
-        <button 
+        <button
           className={`filter-toggle-btn ${showFilters ? 'active' : ''} ${hasActiveFilters ? 'has-filters' : ''}`}
           onClick={() => setShowFilters(!showFilters)}
         >
@@ -204,10 +204,16 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
             <label className="filter-label">Search In</label>
             <div className="filter-buttons">
               <button
-                className={`filter-btn ${searchType === 'places' ? 'active' : ''}`}
-                onClick={() => setSearchType('places')}
+                className={`filter-btn ${searchType === 'transit' ? 'active' : ''}`}
+                onClick={() => setSearchType('transit')}
               >
-                🍽️ Places
+                🚇 Transit
+              </button>
+              <button
+                className={`filter-btn ${searchType === 'restaurants' ? 'active' : ''}`}
+                onClick={() => setSearchType('restaurants')}
+              >
+                🍽️ Restaurants
               </button>
               <button
                 className={`filter-btn ${searchType === 'events' ? 'active' : ''}`}
@@ -216,10 +222,10 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
                 🎭 Events
               </button>
               <button
-                className={`filter-btn ${searchType === 'all' ? 'active' : ''}`}
-                onClick={() => setSearchType('all')}
+                className={`filter-btn ${searchType === 'landmarks' ? 'active' : ''}`}
+                onClick={() => setSearchType('landmarks')}
               >
-                All
+                🏛️ Landmarks
               </button>
             </div>
           </div>
@@ -268,9 +274,9 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
 
           {/* Clear Filters */}
           {hasActiveFilters && (
-            <button 
+            <button
               className="clear-filters-btn"
-              onClick={() => { setMinRating(0); setPriceLevel(null); setSearchType('places'); }}
+              onClick={() => { setMinRating(0); setPriceLevel(null); setSearchType('transit'); }}
             >
               Clear filters
             </button>

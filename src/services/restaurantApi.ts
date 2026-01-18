@@ -26,6 +26,10 @@ export interface Place {
   serves_brunch?: boolean;
   outdoor_seating?: boolean;
   good_for_groups?: boolean;
+  // Fields for landmarks source
+  name?: string;
+  lat?: number;
+  lng?: number;
 }
 
 // Fetch all places from MongoDB
@@ -33,7 +37,7 @@ export async function fetchPlaces(): Promise<Place[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/places`);
     if (!response.ok) throw new Error(`API error: ${response.status}`);
-    
+
     const data = await response.json();
     return data;
   } catch (error) {
@@ -49,7 +53,7 @@ export function placesToGeoJSON(places: Place[]): GeoJSON.FeatureCollection {
     .map(place => {
       const lat = parseFloat(place.latitude);
       const lng = parseFloat(place.longitude);
-      
+
       if (isNaN(lat) || isNaN(lng)) return null;
 
       // Determine marker color based on rating
@@ -104,4 +108,60 @@ export function placesToGeoJSON(places: Place[]): GeoJSON.FeatureCollection {
 export function getPriceLevel(level: number): string {
   if (level === 0) return 'N/A';
   return '$'.repeat(level);
+}
+
+// Fetch landmarks (non-restaurant places) from MongoDB
+export async function fetchLandmarks(): Promise<Place[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/landmarks`);
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Failed to fetch landmarks:', error);
+    return [];
+  }
+}
+
+// Convert landmarks to GeoJSON for Mapbox (with different coloring)
+export function landmarksToGeoJSON(landmarks: Place[]): GeoJSON.FeatureCollection {
+  const features: GeoJSON.Feature[] = landmarks
+    .filter(r => (r.latitude && r.longitude) || (r.lat && r.lng))
+    .map(place => {
+      // Handle both boston_places and boston_landmarks schemas
+      const lat = place.lat !== undefined ? place.lat : parseFloat(place.latitude || '0');
+      const lng = place.lng !== undefined ? place.lng : parseFloat(place.longitude || '0');
+      const displayName = place.name || place.businessname || 'Unknown Landmark';
+
+      if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return null;
+
+      // Use a purple/landmark color scheme
+      const markerColor = '#8b5cf6'; // purple for landmarks
+
+      return {
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [lng, lat]
+        },
+        properties: {
+          id: place._id,
+          name: displayName,
+          address: place.address,
+          city: place.city || 'Boston',
+          rating: place.rating || 0,
+          ratingCount: place.user_rating_count || 0,
+          categories: place.categories?.join(', ') || '',
+          phone: place.phone || '',
+          website: place.website || '',
+          googleMapsUrl: place.google_maps_url || '',
+          photoName: place.photo_name || '',
+          markerColor,
+        },
+      };
+    })
+    .filter(f => f !== null) as GeoJSON.Feature[];
+
+  return { type: 'FeatureCollection', features };
 }

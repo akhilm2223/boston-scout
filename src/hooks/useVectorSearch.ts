@@ -45,7 +45,7 @@ export function useVectorSearch(options: UseVectorSearchOptions = {}): UseVector
   const [hasMore, setHasMore] = useState(false);
   const [cursor, setCursor] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
-  const [searchType, setSearchType] = useState<SearchType>('places');
+  const [searchType, setSearchType] = useState<SearchType>('transit');
 
   // Refs for debouncing and caching
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -81,42 +81,16 @@ export function useVectorSearch(options: UseVectorSearchOptions = {}): UseVector
 
     try {
       const currentSearchType = searchTypeRef.current;
-      
-      if (currentSearchType === 'all') {
-        // Fetch both places and events in parallel
-        const [placesRes, eventsRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/places/vibe-search`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: searchQuery, limit: Math.ceil(initialLimit / 2) }),
-            signal: abortControllerRef.current.signal
-          }),
-          fetch(`${API_BASE_URL}/api/events/vibe-search`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: searchQuery, limit: Math.ceil(initialLimit / 2) }),
-            signal: abortControllerRef.current.signal
-          })
-        ]);
 
-        if (!placesRes.ok || !eventsRes.ok) {
-          throw new Error('Search failed');
-        }
-
-        const placesData: VibeSearchResponse = await placesRes.json();
-        const eventsData: EventVibeSearchResponse = await eventsRes.json();
-
-        // Tag results with their type
-        const taggedPlaces: UnifiedSearchResult[] = placesData.results.map(p => ({ ...p, type: 'place' as const }));
-        const taggedEvents: UnifiedSearchResult[] = eventsData.results.map(e => ({ ...e, type: 'event' as const }));
-
-        // Interleave results by score
-        const combined = [...taggedPlaces, ...taggedEvents].sort((a, b) => (b.score || 0) - (a.score || 0));
-
-        setResults(combined);
-        setTotal(placesData.count + eventsData.count);
-        setHasMore(false); // Disable pagination for combined search
+      if (currentSearchType === 'transit') {
+        // Transit mode - show MBTA stops/routes info
+        // Transit is handled by the map layer, clear list results
+        setResults([]);
+        setTotal(0);
+        setHasMore(false);
         setCursor(null);
+        setIsLoading(false);
+        return;
 
       } else if (currentSearchType === 'events') {
         // Search events only
@@ -142,14 +116,16 @@ export function useVectorSearch(options: UseVectorSearchOptions = {}): UseVector
         setHasMore(data.results.length >= initialLimit);
         setCursor(data.results.length > 0 ? data.results[data.results.length - 1]._id : null);
 
-      } else {
-        // Search places only (default)
+      } else if (currentSearchType === 'restaurants' || currentSearchType === 'landmarks') {
+        // Search places with type filter
+        const placeType = currentSearchType === 'restaurants' ? 'restaurant' : 'landmark';
         const response = await fetch(`${API_BASE_URL}/api/places/vibe-search`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             query: searchQuery,
-            limit: initialLimit
+            limit: initialLimit,
+            placeType: placeType
           }),
           signal: abortControllerRef.current.signal
         });
@@ -184,7 +160,7 @@ export function useVectorSearch(options: UseVectorSearchOptions = {}): UseVector
    */
   const loadMore = useCallback(async () => {
     if (!cursor || isLoading || !hasMore) return;
-    
+
     // Validate cursor is a valid ObjectId format (24 hex chars)
     if (!/^[0-9a-fA-F]{24}$/.test(cursor)) {
       console.warn('Invalid cursor format, skipping loadMore:', cursor);
@@ -199,7 +175,7 @@ export function useVectorSearch(options: UseVectorSearchOptions = {}): UseVector
         cursor,
         limit: initialLimit.toString()
       });
-      
+
       // Only add query if it's not empty
       if (query && query.trim()) {
         params.set('query', query.trim());
@@ -217,7 +193,9 @@ export function useVectorSearch(options: UseVectorSearchOptions = {}): UseVector
 
       const data: InfiniteScrollResponse = await infiniteResponse.json();
 
-      setResults(prev => [...prev, ...data.items]);
+      // Tag items with type before adding to results
+      const taggedItems: UnifiedSearchResult[] = data.items.map(item => ({ ...item, type: 'place' as const }));
+      setResults(prev => [...prev, ...taggedItems]);
       setHasMore(data.hasMore);
       setCursor(data.nextCursor);
       setTotal(data.total);

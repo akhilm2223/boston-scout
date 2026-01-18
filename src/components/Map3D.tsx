@@ -7,7 +7,7 @@ import {
   vehiclesToGeoJSON, stopsToGeoJSON,
   type MBTARoute, type MBTAAlert
 } from '../services/mbtaApi';
-import { fetchPlaces, placesToGeoJSON } from '../services/restaurantApi';
+import { fetchPlaces, placesToGeoJSON, fetchLandmarks, landmarksToGeoJSON } from '../services/restaurantApi';
 import { fetchEvents, eventsToGeoJSON, formatEventDate, formatEventTime } from '../services/eventsApi';
 import { generatePlaceInsightHTML } from '../services/geminiApi';
 import { MBTA_ARC_TRACKS } from '../data/mbtaArcTracks';
@@ -129,6 +129,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
   const [showPlaces, setShowPlaces] = useState(false);
   const [showTransitLayers, setShowTransitLayers] = useState(true);
   const [showEvents, setShowEvents] = useState(false);
+  const [showLandmarks, setShowLandmarks] = useState(false);
   const [is3DMode, setIs3DMode] = useState(true);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
 
@@ -924,6 +925,161 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         mapInstance.getCanvas().style.cursor = '';
       });
 
+      // ===========================================
+      // LANDMARK MARKERS (Purple icons)
+      // ===========================================
+
+      mapInstance.addSource('landmarks', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      // Landmark glow - purple/violet theme
+      mapInstance.addLayer({
+        id: 'landmarks-glow',
+        type: 'circle',
+        source: 'landmarks',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 12, 14, 18, 16, 25],
+          'circle-color': '#a855f7',
+          'circle-blur': 0.8,
+          'circle-opacity': 0.7,
+        },
+        minzoom: 10,
+      });
+
+      // Landmark "L" text marker
+      mapInstance.addLayer({
+        id: 'landmarks-marker',
+        type: 'symbol',
+        source: 'landmarks',
+        layout: {
+          'text-field': 'L',
+          'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 10, 16, 14, 24, 16, 32],
+          'text-allow-overlap': true,
+        },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': '#8b5cf6',
+          'text-halo-width': 3,
+        },
+        minzoom: 10,
+      });
+
+      // Landmark labels
+      mapInstance.addLayer({
+        id: 'landmarks-label',
+        type: 'symbol',
+        source: 'landmarks',
+        layout: {
+          'text-field': ['get', 'name'],
+          'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+          'text-size': 11,
+          'text-offset': [0, 1.5],
+          'text-anchor': 'top',
+          'text-max-width': 12,
+        },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': '#000000',
+          'text-halo-width': 1.5,
+        },
+        minzoom: 14,
+      });
+
+      // Landmark click interaction
+      mapInstance.on('click', 'landmarks-marker', (e) => {
+        if (!e.features || e.features.length === 0) return;
+
+        const props = e.features[0].properties;
+        if (!props) return;
+        const coordinates = (e.features[0].geometry as any).coordinates.slice();
+
+        // Build rating stars (black and white)
+        const rating = props.rating || 0;
+        const fullStars = Math.floor(rating);
+        const hasHalfStar = rating % 1 >= 0.5;
+        let starsHTML = '';
+        for (let i = 0; i < 5; i++) {
+          if (i < fullStars) {
+            starsHTML += '<span style="color: #000;">★</span>';
+          } else if (i === fullStars && hasHalfStar) {
+            starsHTML += '<span style="color: #000;">⯨</span>';
+          } else {
+            starsHTML += '<span style="color: #d1d5db;">★</span>';
+          }
+        }
+
+        // Photo URL (black and white gradient fallback)
+        const photoUrl = props.photoName ?
+          (props.photoName.startsWith('http') ? props.photoName :
+            props.photoName.startsWith('places/') ?
+              `https://places.googleapis.com/v1/${props.photoName}/media?maxHeightPx=400&maxWidthPx=400&key=${GOOGLE_MAPS_API_KEY}` :
+              `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${props.photoName}&key=${GOOGLE_MAPS_API_KEY}`) : '';
+
+        const photoHTML = props.photoName ?
+          `<div class="popup-photo">
+            <img src="${photoUrl}" 
+                 alt="${props.name}"
+                 onerror="this.parentElement.style.background='linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%)'; this.style.display='none';" />
+            <div style="position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); padding: 5px 10px; border-radius: 6px; font-size: 12px; color: #000; font-weight: 700; border: 1px solid #e5e7eb;">
+              ${starsHTML} <span style="margin-left: 4px;">${rating.toFixed(1)}</span>
+            </div>
+          </div>` :
+          `<div class="popup-photo-placeholder" style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);">
+            <span style="font-size: 48px;">🏛️</span>
+            ${rating > 0 ? `<div style="position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); padding: 5px 10px; border-radius: 6px; font-size: 12px; color: #000; font-weight: 700; border: 1px solid #e5e7eb;">
+              ${starsHTML} <span style="margin-left: 4px;">${rating.toFixed(1)}</span>
+            </div>` : ''}
+          </div>`;
+
+        const popupHTML = `
+          <div class="landmark-popup" style="min-width: 260px; max-width: 300px; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;">
+            ${photoHTML}
+            <div style="padding: 12px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="display: inline-block; padding: 4px 10px; background: #8b5cf6; color: #fff; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+                  Landmark
+                </span>
+                ${props.ratingCount > 0 ? `<span style="font-size: 11px; color: #6b7280;">(${props.ratingCount} reviews)</span>` : ''}
+              </div>
+              
+              <h3 style="margin: 0 0 8px 0; font-size: 17px; font-weight: 700; color: #000; line-height: 1.3;">
+                ${props.name}
+              </h3>
+              
+              ${props.categories ? `<p style="margin: 0 0 10px 0; font-size: 12px; color: #666; line-height: 1.4;">
+                ${props.categories}
+              </p>` : ''}
+              
+              <div style="display: flex; align-items: start; gap: 8px; margin-bottom: 12px;">
+                <span style="font-size: 14px; margin-top: 2px;">📍</span>
+                <span style="font-size: 12px; color: #6b7280; line-height: 1.4;">${props.address}</span>
+              </div>
+              
+              ${props.googleMapsUrl ? `<a href="${props.googleMapsUrl}" target="_blank" style="display: block; text-align: center; padding: 10px 16px; background: #8b5cf6; color: #fff; text-decoration: none; border-radius: 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.3px; transition: background 0.2s;">
+                Get Directions
+              </a>` : ''}
+            </div>
+          </div>
+        `;
+
+        new mapboxgl.Popup({ maxWidth: '320px', className: 'landmark-popup-container' })
+          .setLngLat(coordinates)
+          .setHTML(popupHTML)
+          .addTo(mapInstance);
+      });
+
+      // Cursor change on landmark hover
+      mapInstance.on('mouseenter', 'landmarks-marker', () => {
+        mapInstance.getCanvas().style.cursor = 'pointer';
+      });
+
+      mapInstance.on('mouseleave', 'landmarks-marker', () => {
+        mapInstance.getCanvas().style.cursor = '';
+      });
+
       // Place click interaction
       mapInstance.on('click', 'places-marker', async (e) => {
         if (!e.features || e.features.length === 0) return;
@@ -1001,55 +1157,50 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
                 ${props.name}
               </h3>
               
-              ${
-					!photoHTML
-						? `<div style="margin: 10px 0; display: flex; align-items: center; gap: 10px;">
+              ${!photoHTML
+            ? `<div style="margin: 10px 0; display: flex; align-items: center; gap: 10px;">
                 <div style="font-size: 15px; line-height: 1;">${starsHTML}</div>
                 <span style="font-size: 15px; font-weight: 700; color: #000;">${rating > 0 ? rating.toFixed(1) : "No rating"}</span>
                 ${props.ratingCount > 0 ? `<span style="font-size: 13px; color: #666; font-weight: 500;">(${props.ratingCount})</span>` : ""}
                 ${priceLevel ? `<span style="margin-left: auto;">${priceLevel}</span>` : ""}
               </div>`
-						: ""
-				}
+            : ""
+          }
               
               <div style="margin: 10px 0; display: flex; align-items: start; gap: 8px;">
                 <span style="font-size: 14px; color: #000; margin-top: 1px;">📍</span>
                 <span style="font-size: 13px; color: #000; font-weight: 500; line-height: 1.4;">${props.address}, ${props.city}</span>
               </div>
               
-              ${
-					props.categories
-						? `<div style="margin: 10px 0; font-size: 12px; color: #4a4a4a; line-height: 1.5; font-weight: 500;">
+              ${props.categories
+            ? `<div style="margin: 10px 0; font-size: 12px; color: #4a4a4a; line-height: 1.5; font-weight: 500;">
                 ${props.categories.split(",").slice(0, 3).join(" • ")}
               </div>`
-						: ""
-				}
+            : ""
+          }
               
               ${insightHTML}
               
-              ${
-					badges.length > 0
-						? `<div style="margin: 12px 0; display: flex; flex-wrap: wrap; gap: 6px;">
+              ${badges.length > 0
+            ? `<div style="margin: 12px 0; display: flex; flex-wrap: wrap; gap: 6px;">
                 ${badges.join("")}
               </div>`
-						: ""
-				}
+            : ""
+          }
               
               <div style="margin-top: 14px; padding-top: 14px; border-top: 2px solid #e5e7eb; display: flex; gap: 8px;">
-                ${
-					props.phone
-						? `<a href="tel:${props.phone}" style="flex: 1; text-align: center; padding: 10px 14px; background: #000; color: #fff; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700; transition: all 0.2s; letter-spacing: 0.3px;">
+                ${props.phone
+            ? `<a href="tel:${props.phone}" style="flex: 1; text-align: center; padding: 10px 14px; background: #000; color: #fff; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700; transition: all 0.2s; letter-spacing: 0.3px;">
                   Call
                 </a>`
-						: ""
-				}
-                ${
-					props.googleMapsUrl
-						? `<a href="${props.googleMapsUrl}" target="_blank" style="flex: 1; text-align: center; padding: 10px 14px; background: #fff; color: #000; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700; border: 2px solid #000; transition: all 0.2s; letter-spacing: 0.3px;">
+            : ""
+          }
+                ${props.googleMapsUrl
+            ? `<a href="${props.googleMapsUrl}" target="_blank" style="flex: 1; text-align: center; padding: 10px 14px; background: #fff; color: #000; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700; border: 2px solid #000; transition: all 0.2s; letter-spacing: 0.3px;">
                   Directions
                 </a>`
-						: ""
-				}
+            : ""
+          }
               </div>
             </div>
           </div>
@@ -1338,17 +1489,19 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       console.log('[Map] Loading initial data inside on(load)...');
 
       try {
-        const [routesData, alertsData, stopsData, placesData, eventsData] = await Promise.all([
+        const [routesData, alertsData, stopsData, placesData, eventsData, landmarksData] = await Promise.all([
           fetchRoutes(),
           fetchAlerts(),
           fetchStops(),
           fetchPlaces(),
           fetchEvents(),
+          fetchLandmarks(),
         ]);
 
         console.log('[MBTA] Data loaded - routes:', routesData.length, 'stops:', stopsData.length, 'alerts:', alertsData.length);
         console.log('[Places] Loaded:', placesData.length, 'places');
         console.log('[Events] Loaded:', eventsData.length, 'events');
+        console.log('[Landmarks] Loaded:', landmarksData.length, 'landmarks');
 
         // Set stops data
         if (mapInstance.getSource('mbta-stops')) {
@@ -1376,6 +1529,16 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
           console.log('[Events] ✓ Data set on map!');
         } else {
           console.warn('[Events] Source not found!');
+        }
+
+        // Set landmarks data
+        if (mapInstance.getSource('landmarks')) {
+          const landmarksGeoJSON = landmarksToGeoJSON(landmarksData);
+          console.log('[Landmarks] Setting GeoJSON with', landmarksGeoJSON.features.length, 'features');
+          (mapInstance.getSource('landmarks') as mapboxgl.GeoJSONSource).setData(landmarksGeoJSON);
+          console.log('[Landmarks] ✓ Data set on map!');
+        } else {
+          console.warn('[Landmarks] Source not found!');
         }
 
         // Store route data for vehicle updates
@@ -1744,6 +1907,30 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       }
     });
   }, [showEvents, isLoaded]);
+
+  // Landmarks visibility toggle
+  useEffect(() => {
+    if (!map.current || !isLoaded) return;
+    const vis = showLandmarks ? 'visible' : 'none';
+    const layers = [
+      'landmarks-glow',
+      'landmarks-marker',
+      'landmarks-label'
+    ];
+
+    layers.forEach(layer => {
+      try {
+        if (map.current?.getLayer(layer)) {
+          map.current.setLayoutProperty(layer, 'visibility', vis);
+          console.log(`[Landmarks] ${layer} visibility set to ${vis}`);
+        } else {
+          console.warn(`[Landmarks] Layer "${layer}" not found on map`);
+        }
+      } catch (error) {
+        console.error(`[Landmarks] Error setting visibility for ${layer}:`, error);
+      }
+    });
+  }, [showLandmarks, isLoaded]);
 
   // 2D/3D mode toggle
   useEffect(() => {
@@ -2257,13 +2444,12 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         <button
           className={`layer-toggle-btn ${showPlaces ? 'active' : ''}`}
           onClick={() => setShowPlaces(!showPlaces)}
-          title="Toggle Places"
+          title="Toggle Restaurants"
         >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
-                <circle cx="12" cy="9" r="2.5" />
-            </svg>
-          <span>Places</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />
+          </svg>
+          <span>Restaurants</span>
         </button>
 
         <button
@@ -2278,6 +2464,17 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
             <line x1="3" y1="10" x2="21" y2="10" />
           </svg>
           <span>Events</span>
+        </button>
+
+        <button
+          className={`layer-toggle-btn ${showLandmarks ? 'active' : ''}`}
+          onClick={() => setShowLandmarks(!showLandmarks)}
+          title="Toggle Landmarks"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6" />
+          </svg>
+          <span>Landmarks</span>
         </button>
       </div>
 

@@ -1,7 +1,7 @@
 // Vector Search Types for Vascular Discovery Engine
 
 // Search type filter
-export type SearchType = 'places' | 'events' | 'all';
+export type SearchType = 'transit' | 'restaurants' | 'events' | 'landmarks';
 
 export interface VectorSearchResult {
   _id: string;
