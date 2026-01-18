@@ -48,7 +48,7 @@ function App() {
     walkingDistanceMiles: 0.5, // 10 min * 3 mph / 60 = 0.5 miles
   });
 
-  // Dark mode state - controls theme across the entire app
+  //Dark mode state - controls theme across the entire app
   const [isDarkMode, setIsDarkMode] = useState(false); // Default to light mode
   const [isIndustrialTheme] = useState(true); // Enable industrial theme by default
 
@@ -88,9 +88,22 @@ function App() {
   // Itinerary State
   const [itineraryEvents, setItineraryEvents] = useState<ItineraryEvent[]>([]);
   const [showWelcome, setShowWelcome] = useState(true);
+  const [voiceOnboardingActive, setVoiceOnboardingActive] = useState(false);
+  
+  // Map control state for voice commands
+  const [mapCommand, setMapCommand] = useState<{
+    action: 'zoom_in' | 'zoom_out' | 'fly_to';
+    location?: string;
+    timestamp: number;
+  } | null>(null);
 
-  const handleDisplayStart = useCallback((_mode: 'voice' | 'chat') => {
+  const handleDisplayStart = useCallback((mode: 'voice' | 'chat') => {
     setShowWelcome(false);
+
+    // If voice mode, activate voice onboarding  
+    if (mode === 'voice') {
+      setVoiceOnboardingActive(true);
+    }
   }, []);
 
   const handleLocationClick = useCallback((location: [number, number], name: string) => {
@@ -108,10 +121,22 @@ function App() {
     setItineraryEvents(prev => prev.filter(e => e.id !== eventId));
   }, []);
 
+  // Simple layer visibility setter for voice onboarding
+  // For now, just log - Map3D manages its own layer state
+  const handleSetLayerVisibility = useCallback((layer: 'places' | 'events' | 'landmarks', visible: boolean) => {
+    console.log(`[App] Voice requested ${layer} layer:`, visible ? 'ON' : 'OFF');
+    // TODO: Pass this to Map3D component to actually toggle layers
+  }, []);
+
+  // Map control handler for voice commands
+  const handleMapControl = useCallback((action: 'zoom_in' | 'zoom_out' | 'fly_to', location?: string) => {
+    console.log(`[App] Map control: ${action}`, location || '');
+    setMapCommand({ action, location, timestamp: Date.now() });
+  }, []);
+
   if (showWelcome) {
     return <WelcomeScreen onStart={handleDisplayStart} />;
   }
-
 
   return (
     <div className={`app ${isDarkMode ? 'dark' : 'light'}`}>
@@ -126,6 +151,10 @@ function App() {
           onTripDatesChange={setTripDates}
           walkingPreferences={walkingPreferences}
           onWalkingPreferencesChange={setWalkingPreferences}
+          voiceOnboardingActive={voiceOnboardingActive}
+          onVoiceOnboardingComplete={() => setVoiceOnboardingActive(false)}
+          setLayerVisibility={handleSetLayerVisibility}
+          onMapControl={handleMapControl}
         />
       </div>
 
@@ -137,6 +166,7 @@ function App() {
             selectedLocation={selectedLocation}
             isDarkMode={isDarkMode}
             setIsDarkMode={setIsDarkMode}
+            mapCommand={mapCommand}
           />
         </MapErrorBoundary>
       </div>

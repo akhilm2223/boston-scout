@@ -22,6 +22,11 @@ interface Map3DProps {
   selectedLocation?: { location: [number, number]; name: string } | null;
   isDarkMode: boolean;
   setIsDarkMode: (value: boolean) => void;
+  mapCommand?: {
+    action: 'zoom_in' | 'zoom_out' | 'fly_to';
+    location?: string;
+    timestamp: number;
+  } | null;
 }
 
 // Boston downtown center
@@ -106,7 +111,7 @@ function lerpColor(c1: string, c2: string, t: number): string {
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 }
 
-export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDarkMode }: Map3DProps) {
+export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDarkMode, mapCommand }: Map3DProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -2328,6 +2333,83 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
     setTimeout(pulseBuildings, 500);
 
   }, [selectedLocation, isLoaded]);
+
+  // Handle voice-controlled map commands
+  useEffect(() => {
+    if (!map.current || !isLoaded || !mapCommand) return;
+
+    console.log('[Map3D] Executing map command:', mapCommand.action, mapCommand.location);
+
+    if (mapCommand.action === 'zoom_in') {
+      map.current.zoomIn({ duration: 500 });
+    } else if (mapCommand.action === 'zoom_out') {
+      map.current.zoomOut({ duration: 500 });
+    } else if (mapCommand.action === 'fly_to' && mapCommand.location) {
+      // Known Boston neighborhoods/areas
+      const bostonLocations: Record<string, [number, number]> = {
+        'chinatown': [-71.0612, 42.3513],
+        'back bay': [-71.0815, 42.3503],
+        'beacon hill': [-71.0686, 42.3588],
+        'north end': [-71.0544, 42.3647],
+        'south end': [-71.0724, 42.3414],
+        'fenway': [-71.0972, 42.3467],
+        'seaport': [-71.0389, 42.3488],
+        'downtown': [-71.0589, 42.3601],
+        'cambridge': [-71.1097, 42.3736],
+        'harvard': [-71.1167, 42.3770],
+        'mit': [-71.0921, 42.3601],
+        'south boston': [-71.0389, 42.3388],
+        'dorchester': [-71.0574, 42.3016],
+        'roxbury': [-71.0853, 42.3126],
+        'jamaica plain': [-71.1156, 42.3097],
+        'allston': [-71.1327, 42.3539],
+        'brighton': [-71.1566, 42.3489],
+        'charlestown': [-71.0628, 42.3782],
+        'east boston': [-71.0247, 42.3751],
+        'financial district': [-71.0561, 42.3555],
+        'theater district': [-71.0636, 42.3519],
+        'waterfront': [-71.0503, 42.3592],
+        'faneuil hall': [-71.0568, 42.3601],
+        'boston common': [-71.0636, 42.3554],
+        'public garden': [-71.0697, 42.3541],
+        'prudential': [-71.0819, 42.3470],
+        'copley': [-71.0775, 42.3499],
+        'newbury street': [-71.0785, 42.3510],
+      };
+
+      const locationKey = mapCommand.location.toLowerCase();
+      let targetCoords: [number, number] | null = null;
+
+      // Check for exact match first
+      if (bostonLocations[locationKey]) {
+        targetCoords = bostonLocations[locationKey];
+      } else {
+        // Check for partial match
+        for (const [key, coords] of Object.entries(bostonLocations)) {
+          if (locationKey.includes(key) || key.includes(locationKey)) {
+            targetCoords = coords;
+            break;
+          }
+        }
+      }
+
+      if (targetCoords) {
+        console.log('[Map3D] Flying to:', locationKey, targetCoords);
+        map.current.flyTo({
+          center: targetCoords,
+          zoom: 16,
+          pitch: 60,
+          bearing: 30,
+          duration: 2000,
+          essential: true,
+        });
+      } else {
+        console.log('[Map3D] Unknown location:', mapCommand.location);
+        // Default: zoom in slightly on current view
+        map.current.zoomIn({ duration: 500 });
+      }
+    }
+  }, [mapCommand, isLoaded]);
 
   // ===========================================
   // EXPAND MAP TOGGLE - Cinematic Fullscreen
