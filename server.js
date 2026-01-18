@@ -13,7 +13,7 @@ app.use(cors());
 app.use(express.json());
 
 let db;
-let restaurantsCollection;
+let placesCollection;
 let eventsCollection;
 
 // Connect to MongoDB
