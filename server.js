@@ -634,13 +634,14 @@ app.get('/api/places/infinite', async (req, res) => {
     const limitNum = Math.min(parseInt(limit) || 10, 50);
 
     let matchQuery = {};
+    let searchFilter = null;
 
     // If there's a search query, filter by it
     if (query && query.trim()) {
       const searchTerms = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
       if (searchTerms.length > 0) {
         const regexPattern = searchTerms.join('|');
-        matchQuery = {
+        searchFilter = {
           $or: [
             { businessname: { $regex: regexPattern, $options: 'i' } },
             { categories: { $regex: regexPattern, $options: 'i' } }
@@ -649,10 +650,19 @@ app.get('/api/places/infinite', async (req, res) => {
       }
     }
 
-    // Add cursor for pagination
+    // Build final query - combine search filter and cursor
     if (cursor) {
       const { ObjectId } = await import('mongodb');
-      matchQuery._id = { $gt: new ObjectId(cursor) };
+      const cursorFilter = { _id: { $gt: new ObjectId(cursor) } };
+      
+      if (searchFilter) {
+        // Combine search and cursor with $and
+        matchQuery = { $and: [searchFilter, cursorFilter] };
+      } else {
+        matchQuery = cursorFilter;
+      }
+    } else if (searchFilter) {
+      matchQuery = searchFilter;
     }
 
     const items = await placesCollection
@@ -669,8 +679,9 @@ app.get('/api/places/infinite', async (req, res) => {
 
     const nextCursor = hasMore && items.length > 0 ? items[items.length - 1]._id.toString() : null;
 
-    // Get total count (cached or computed)
-    const total = await placesCollection.countDocuments(query && query.trim() ? matchQuery : {});
+    // Get total count for the search (not affected by cursor)
+    const countQuery = searchFilter || {};
+    const total = await placesCollection.countDocuments(countQuery);
 
     res.json({
       items,
