@@ -21,7 +21,7 @@ export interface SearchResult {
     events: BostonEvent[];
 }
 
-export interface Restaurant {
+export interface Place {
 	_id: string;
 	businessname: string;
 	address: string;

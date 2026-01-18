@@ -1,1 +1,1 @@
-export type { ItineraryEvent, SearchResult, Restaurant, PlacesPanelProps, BostonEvent } from './types';
+export type { ItineraryEvent, SearchResult, Place, PlacesPanelProps, BostonEvent } from './types';

@@ -1,17 +1,17 @@
-// Gemini API Service for Restaurant Insights
+// Gemini API Service for Place Insights
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
-interface RestaurantInsight {
+interface PlaceInsight {
   whyVisit: string;
   bestTime: string;
 }
 
 // Cache to avoid repeated API calls
-const insightCache = new Map<string, RestaurantInsight>();
+const insightCache = new Map<string, PlaceInsight>();
 
-// Smart fallbacks based on restaurant type
-function getSmartFallback(categories: string, rating: number): RestaurantInsight {
+// Smart fallbacks based on place type
+function getSmartFallback(categories: string, rating: number): PlaceInsight {
   const lowerCat = categories.toLowerCase();
 
   // Determine best time based on category
@@ -56,19 +56,19 @@ function getSmartFallback(categories: string, rating: number): RestaurantInsight
   return { whyVisit, bestTime };
 }
 
-export async function getRestaurantInsight(
+export async function getPlaceInsight(
   name: string,
   categories: string,
   rating: number,
   city: string
-): Promise<RestaurantInsight> {
+): Promise<PlaceInsight> {
   // Check cache first
   const cacheKey = `${name}-${city}`;
   if (insightCache.has(cacheKey)) {
     return insightCache.get(cacheKey)!;
   }
 
-  // Smart fallback based on restaurant type
+  // Smart fallback based on place type
   const fallback = getSmartFallback(categories, rating);
 
   if (!GEMINI_API_KEY) {
@@ -117,7 +117,7 @@ Be specific and authentic. Focus on what locals love.`;
     const whyMatch = text.match(/WHY:\s*(.+?)(?:\n|BEST TIME|$)/i);
     const bestTimeMatch = text.match(/BEST TIME:\s*(.+?)(?:\n|$)/i);
 
-    const insight: RestaurantInsight = {
+    const insight: PlaceInsight = {
       whyVisit: whyMatch?.[1]?.trim() || fallback.whyVisit,
       bestTime: bestTimeMatch?.[1]?.trim() || fallback.bestTime
     };
@@ -127,19 +127,19 @@ Be specific and authentic. Focus on what locals love.`;
 
     return insight;
   } catch (error) {
-    console.error('Failed to get restaurant insight:', error);
+    console.error('Failed to get place insight:', error);
     return fallback;
   }
 }
 
 // Generate insight on-demand (for popup)
-export async function generateRestaurantInsightHTML(
+export async function generatePlaceInsightHTML(
   name: string,
   categories: string,
   rating: number,
   city: string
 ): Promise<string> {
-  const insight = await getRestaurantInsight(name, categories, rating, city);
+  const insight = await getPlaceInsight(name, categories, rating, city);
 
   return `
     <div style="margin: 12px 0; padding: 12px; background: #fafafa; border-radius: 6px; border-left: 3px solid #000;">

@@ -7,9 +7,9 @@ import {
   vehiclesToGeoJSON, stopsToGeoJSON,
   type MBTARoute, type MBTAAlert
 } from '../services/mbtaApi';
-import { fetchRestaurants, restaurantsToGeoJSON } from '../services/restaurantApi';
+import { fetchPlaces, placesToGeoJSON } from '../services/restaurantApi';
 import { fetchEvents, eventsToGeoJSON, formatEventDate, formatEventTime } from '../services/eventsApi';
-import { generateRestaurantInsightHTML } from '../services/geminiApi';
+import { generatePlaceInsightHTML } from '../services/geminiApi';
 import { MBTA_ARC_TRACKS } from '../data/mbtaArcTracks';
 import { TRAINS_ARC_TRACKS } from '../data/trainsArcTracks';
 import './Map3D.css';
@@ -126,7 +126,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
 
   const [systemStress, setSystemStress] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showRestaurants, setShowRestaurants] = useState(false);
+  const [showPlaces, setShowPlaces] = useState(false);
   const [showTransitLayers, setShowTransitLayers] = useState(true);
   const [showEvents, setShowEvents] = useState(false);
   const [is3DMode, setIs3DMode] = useState(true);
@@ -212,7 +212,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/light-v11',
       center: [-71.0589, 42.3601], // Boston downtown
-      zoom: 14, // Better zoom to see restaurants/events (was 15)
+      zoom: 14, // Better zoom to see places/events (was 15)
       pitch: 60, // Reduced for better visibility (was 65)
       bearing: -15,
       maxBounds: [[-71.95, 42.15], [-70.85, 42.50]],
@@ -264,12 +264,12 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       setTimeout(() => {
         mapInstance.easeTo({
           center: [-71.0589, 42.3601], // Boston downtown
-          zoom: 14, // Good zoom to see restaurants/events/transit
+          zoom: 14, // Good zoom to see places/events/transit
           pitch: 60,
           bearing: -15,
           duration: 1500
         });
-        console.log('[Map] Initial view set - zoom in to see restaurants and events');
+        console.log('[Map] Initial view set - zoom in to see places and events');
       }, 500);
 
       // ===========================================
@@ -719,19 +719,19 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       });
 
       // ===========================================
-      // RESTAURANT MARKERS
+      // PLACE MARKERS
       // ===========================================
 
-      mapInstance.addSource('restaurants', {
+      mapInstance.addSource('places', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
       });
 
-      // Restaurant glow (rating-based color) - ENHANCED VISIBILITY
+      // Place glow (rating-based color) - ENHANCED VISIBILITY
       mapInstance.addLayer({
-        id: 'restaurants-glow',
+        id: 'places-glow',
         type: 'circle',
-        source: 'restaurants',
+        source: 'places',
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 8, 14, 14, 16, 20],
           'circle-color': ['get', 'markerColor'],
@@ -741,11 +741,11 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         minzoom: 10,
       });
 
-      // Restaurant marker - ENHANCED VISIBILITY
+      // Place marker - ENHANCED VISIBILITY
       mapInstance.addLayer({
-        id: 'restaurants-marker',
+        id: 'places-marker',
         type: 'circle',
-        source: 'restaurants',
+        source: 'places',
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 4, 14, 6, 16, 10],
           'circle-color': ['get', 'markerColor'],
@@ -755,11 +755,11 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         minzoom: 10,
       });
 
-      // Restaurant labels (show at higher zoom)
+      // Place labels (show at higher zoom)
       mapInstance.addLayer({
-        id: 'restaurants-label',
+        id: 'places-label',
         type: 'symbol',
-        source: 'restaurants',
+        source: 'places',
         layout: {
           'text-field': ['get', 'name'],
           'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
@@ -924,8 +924,8 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         mapInstance.getCanvas().style.cursor = '';
       });
 
-      // Restaurant click interaction
-      mapInstance.on('click', 'restaurants-marker', async (e) => {
+      // Place click interaction
+      mapInstance.on('click', 'places-marker', async (e) => {
         if (!e.features || e.features.length === 0) return;
 
         const props = e.features[0].properties;
@@ -985,7 +985,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
           : '';
 
         // Generate Gemini insight
-        const insightHTML = await generateRestaurantInsightHTML(
+        const insightHTML = await generatePlaceInsightHTML(
           props.name,
           props.categories || '',
           rating,
@@ -993,7 +993,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         );
 
         const popupHTML = `
-          <div class="restaurant-popup">
+          <div class="place-popup">
             ${photoHTML}
             
             <div>
@@ -1001,35 +1001,55 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
                 ${props.name}
               </h3>
               
-              ${!photoHTML ? `<div style="margin: 10px 0; display: flex; align-items: center; gap: 10px;">
+              ${
+					!photoHTML
+						? `<div style="margin: 10px 0; display: flex; align-items: center; gap: 10px;">
                 <div style="font-size: 15px; line-height: 1;">${starsHTML}</div>
-                <span style="font-size: 15px; font-weight: 700; color: #000;">${rating > 0 ? rating.toFixed(1) : 'No rating'}</span>
-                ${props.ratingCount > 0 ? `<span style="font-size: 13px; color: #666; font-weight: 500;">(${props.ratingCount})</span>` : ''}
-                ${priceLevel ? `<span style="margin-left: auto;">${priceLevel}</span>` : ''}
-              </div>` : ''}
+                <span style="font-size: 15px; font-weight: 700; color: #000;">${rating > 0 ? rating.toFixed(1) : "No rating"}</span>
+                ${props.ratingCount > 0 ? `<span style="font-size: 13px; color: #666; font-weight: 500;">(${props.ratingCount})</span>` : ""}
+                ${priceLevel ? `<span style="margin-left: auto;">${priceLevel}</span>` : ""}
+              </div>`
+						: ""
+				}
               
               <div style="margin: 10px 0; display: flex; align-items: start; gap: 8px;">
                 <span style="font-size: 14px; color: #000; margin-top: 1px;">📍</span>
                 <span style="font-size: 13px; color: #000; font-weight: 500; line-height: 1.4;">${props.address}, ${props.city}</span>
               </div>
               
-              ${props.categories ? `<div style="margin: 10px 0; font-size: 12px; color: #4a4a4a; line-height: 1.5; font-weight: 500;">
-                ${props.categories.split(',').slice(0, 3).join(' • ')}
-              </div>` : ''}
+              ${
+					props.categories
+						? `<div style="margin: 10px 0; font-size: 12px; color: #4a4a4a; line-height: 1.5; font-weight: 500;">
+                ${props.categories.split(",").slice(0, 3).join(" • ")}
+              </div>`
+						: ""
+				}
               
               ${insightHTML}
               
-              ${badges.length > 0 ? `<div style="margin: 12px 0; display: flex; flex-wrap: wrap; gap: 6px;">
-                ${badges.join('')}
-              </div>` : ''}
+              ${
+					badges.length > 0
+						? `<div style="margin: 12px 0; display: flex; flex-wrap: wrap; gap: 6px;">
+                ${badges.join("")}
+              </div>`
+						: ""
+				}
               
               <div style="margin-top: 14px; padding-top: 14px; border-top: 2px solid #e5e7eb; display: flex; gap: 8px;">
-                ${props.phone ? `<a href="tel:${props.phone}" style="flex: 1; text-align: center; padding: 10px 14px; background: #000; color: #fff; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700; transition: all 0.2s; letter-spacing: 0.3px;">
+                ${
+					props.phone
+						? `<a href="tel:${props.phone}" style="flex: 1; text-align: center; padding: 10px 14px; background: #000; color: #fff; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700; transition: all 0.2s; letter-spacing: 0.3px;">
                   Call
-                </a>` : ''}
-                ${props.googleMapsUrl ? `<a href="${props.googleMapsUrl}" target="_blank" style="flex: 1; text-align: center; padding: 10px 14px; background: #fff; color: #000; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700; border: 2px solid #000; transition: all 0.2s; letter-spacing: 0.3px;">
+                </a>`
+						: ""
+				}
+                ${
+					props.googleMapsUrl
+						? `<a href="${props.googleMapsUrl}" target="_blank" style="flex: 1; text-align: center; padding: 10px 14px; background: #fff; color: #000; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700; border: 2px solid #000; transition: all 0.2s; letter-spacing: 0.3px;">
                   Directions
-                </a>` : ''}
+                </a>`
+						: ""
+				}
               </div>
             </div>
           </div>
@@ -1046,28 +1066,28 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
               border: 1.5px solid #d1d5db;
               letter-spacing: 0.2px;
             }
-            .restaurant-popup a:hover {
+            .place-popup a:hover {
               transform: translateY(-1px);
               box-shadow: 0 4px 12px rgba(0,0,0,0.2);
             }
-            .restaurant-popup a:active {
+            .place-popup a:active {
               transform: translateY(0);
             }
           </style>
         `;
 
-        new mapboxgl.Popup({ maxWidth: '340px', className: 'restaurant-popup-container' })
+        new mapboxgl.Popup({ maxWidth: '340px', className: 'place-popup-container' })
           .setLngLat(coordinates)
           .setHTML(popupHTML)
           .addTo(mapInstance);
       });
 
-      // Cursor change on restaurant hover
-      mapInstance.on('mouseenter', 'restaurants-marker', () => {
+      // Cursor change on place hover
+      mapInstance.on('mouseenter', 'places-marker', () => {
         mapInstance.getCanvas().style.cursor = 'pointer';
       });
 
-      mapInstance.on('mouseleave', 'restaurants-marker', () => {
+      mapInstance.on('mouseleave', 'places-marker', () => {
         mapInstance.getCanvas().style.cursor = '';
       });
 
@@ -1318,16 +1338,16 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       console.log('[Map] Loading initial data inside on(load)...');
 
       try {
-        const [routesData, alertsData, stopsData, restaurantsData, eventsData] = await Promise.all([
+        const [routesData, alertsData, stopsData, placesData, eventsData] = await Promise.all([
           fetchRoutes(),
           fetchAlerts(),
           fetchStops(),
-          fetchRestaurants(),
+          fetchPlaces(),
           fetchEvents(),
         ]);
 
         console.log('[MBTA] Data loaded - routes:', routesData.length, 'stops:', stopsData.length, 'alerts:', alertsData.length);
-        console.log('[Restaurants] Loaded:', restaurantsData.length, 'restaurants');
+        console.log('[Places] Loaded:', placesData.length, 'places');
         console.log('[Events] Loaded:', eventsData.length, 'events');
 
         // Set stops data
@@ -1338,14 +1358,14 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
           console.warn('[MBTA] Stops source not found!');
         }
 
-        // Set restaurants data
-        if (mapInstance.getSource('restaurants')) {
-          const restaurantGeoJSON = restaurantsToGeoJSON(restaurantsData);
-          console.log('[Restaurants] Setting GeoJSON with', restaurantGeoJSON.features.length, 'features');
-          (mapInstance.getSource('restaurants') as mapboxgl.GeoJSONSource).setData(restaurantGeoJSON);
-          console.log('[Restaurants] ✓ Data set on map!');
+        // Set places data
+        if (mapInstance.getSource('places')) {
+          const placeGeoJSON = placesToGeoJSON(placesData);
+          console.log('[Places] Setting GeoJSON with', placeGeoJSON.features.length, 'features');
+          (mapInstance.getSource('places') as mapboxgl.GeoJSONSource).setData(placeGeoJSON);
+          console.log('[Places] ✓ Data set on map!');
         } else {
-          console.warn('[Restaurants] Source not found!');
+          console.warn('[Places] Source not found!');
         }
 
         // Set events data
@@ -1677,29 +1697,29 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
     }
   }, [userLocation, isLoaded]);
 
-  // Restaurant visibility toggle
+  // Place visibility toggle
   useEffect(() => {
     if (!map.current || !isLoaded) return;
-    const vis = showRestaurants ? 'visible' : 'none';
+    const vis = showPlaces ? 'visible' : 'none';
     const layers = [
-      'restaurants-glow',
-      'restaurants-marker',
-      'restaurants-label'
+      'places-glow',
+      'places-marker',
+      'places-label'
     ];
 
     layers.forEach(layer => {
       try {
         if (map.current?.getLayer(layer)) {
           map.current.setLayoutProperty(layer, 'visibility', vis);
-          console.log(`[Restaurants] ${layer} visibility set to ${vis}`);
+          console.log(`[Places] ${layer} visibility set to ${vis}`);
         } else {
-          console.warn(`[Restaurants] Layer "${layer}" not found on map`);
+          console.warn(`[Places] Layer "${layer}" not found on map`);
         }
       } catch (error) {
-        console.error(`[Restaurants] Error setting visibility for ${layer}:`, error);
+        console.error(`[Places] Error setting visibility for ${layer}:`, error);
       }
     });
-  }, [showRestaurants, isLoaded]);
+  }, [showPlaces, isLoaded]);
 
   // Events visibility toggle
   useEffect(() => {
@@ -1815,9 +1835,9 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
 
         try {
           // Fetch current data
-          const [stopsData, restaurantsData, eventsData] = await Promise.all([
+          const [stopsData, placesData, eventsData] = await Promise.all([
             fetchStops(),
-            fetchRestaurants(),
+            fetchPlaces(),
             fetchEvents(),
           ]);
 
@@ -1983,25 +2003,25 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
             });
           }
 
-          // Re-add restaurants source and layers - ONLY if restaurants are toggled on
-          if (showRestaurants) {
-            if (!map.current.getSource('restaurants')) {
-              map.current.addSource('restaurants', {
+          // Re-add places source and layers - ONLY if places are toggled on
+          if (showPlaces) {
+            if (!map.current.getSource('places')) {
+              map.current.addSource('places', {
                 type: 'geojson',
                 data: { type: 'FeatureCollection', features: [] },
               });
             }
 
-            if (map.current.getSource('restaurants')) {
-              (map.current.getSource('restaurants') as mapboxgl.GeoJSONSource).setData(restaurantsToGeoJSON(restaurantsData));
+            if (map.current.getSource('places')) {
+              (map.current.getSource('places') as mapboxgl.GeoJSONSource).setData(placesToGeoJSON(placesData));
             }
 
-            // Re-add restaurant layers if they don't exist
-            if (!map.current.getLayer('restaurants-glow')) {
+            // Re-add place layers if they don't exist
+            if (!map.current.getLayer('places-glow')) {
               map.current.addLayer({
-                id: 'restaurants-glow',
+                id: 'places-glow',
                 type: 'circle',
-                source: 'restaurants',
+                source: 'places',
                 paint: {
                   'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 8, 14, 14, 16, 20],
                   'circle-color': ['get', 'markerColor'],
@@ -2012,11 +2032,11 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
               });
             }
 
-            if (!map.current.getLayer('restaurants-marker')) {
+            if (!map.current.getLayer('places-marker')) {
               map.current.addLayer({
-                id: 'restaurants-marker',
+                id: 'places-marker',
                 type: 'circle',
-                source: 'restaurants',
+                source: 'places',
                 paint: {
                   'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 4, 14, 6, 16, 10],
                   'circle-color': ['get', 'markerColor'],
@@ -2027,11 +2047,11 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
               });
             }
 
-            if (!map.current.getLayer('restaurants-label')) {
+            if (!map.current.getLayer('places-label')) {
               map.current.addLayer({
-                id: 'restaurants-label',
+                id: 'places-label',
                 type: 'symbol',
-                source: 'restaurants',
+                source: 'places',
                 layout: {
                   'text-field': ['get', 'name'],
                   'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
@@ -2235,14 +2255,15 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         </button>
 
         <button
-          className={`layer-toggle-btn ${showRestaurants ? 'active' : ''}`}
-          onClick={() => setShowRestaurants(!showRestaurants)}
-          title="Toggle Restaurants"
+          className={`layer-toggle-btn ${showPlaces ? 'active' : ''}`}
+          onClick={() => setShowPlaces(!showPlaces)}
+          title="Toggle Places"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />
-          </svg>
-          <span>Restaurants</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+                <circle cx="12" cy="9" r="2.5" />
+            </svg>
+          <span>Places</span>
         </button>
 
         <button
@@ -2309,7 +2330,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       </div>
 
       {/* View Full Map Toggle Button */}
-      <button
+      {/* <button
         className="expand-map-btn"
         onClick={handleExpandToggle}
         title={isExpanded ? 'Boston Downtown' : 'View Full Map'}
@@ -2324,7 +2345,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
           </svg>
         )}
         <span className="btn-label">{isExpanded ? 'Downtown' : 'Full Map'}</span>
-      </button>
+      </button> */}
     </div>
   );
 }
