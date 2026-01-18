@@ -66,7 +66,6 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
   // City pulse hook for hero options
   const {
     heroOptions,
-    cityPulse,
     isLoading: isPulseLoading
   } = useCityPulse({ updateIntervalMs: 60000 });
 
@@ -113,8 +112,17 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
    * Handle hero option click
    */
   const handleHeroClick = useCallback((option: HeroOption) => {
+    setSearchType('places');
     setQuery(option.query);
-  }, [setQuery]);
+  }, [setQuery, setSearchType]);
+
+  /**
+   * Handle Events button click - switch to events search
+   */
+  const handleEventsClick = useCallback(() => {
+    setSearchType('events');
+    search('upcoming events boston');
+  }, [setSearchType, search]);
 
   /**
    * Convert place or event to itinerary event and add
@@ -288,8 +296,8 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
       <HeroOptions
         options={heroOptions}
         onOptionClick={handleHeroClick}
+        onEventsClick={handleEventsClick}
         isLoading={isPulseLoading}
-        cityPulse={cityPulse}
       />
 
       {/* Virtual Scrolling List */}

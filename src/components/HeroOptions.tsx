@@ -5,25 +5,23 @@ import './HeroOptions.css';
 export interface HeroOptionsProps {
   options: HeroOption[];
   onOptionClick: (option: HeroOption) => void;
+  onEventsClick?: () => void;
   isLoading?: boolean;
-  cityPulse?: 'slow' | 'moderate' | 'active' | 'busy';
 }
 
 /**
- * Hero Options Component - 4 Quick Suggestions
+ * Hero Options Component - Quick Suggestions + Events Button
  *
  * Layout:
- * ┌─────────────────────────────────────────────┐
- * │  [🍝 Italian]  [🎭 Shows]  [🍺 Bars]  [🌳 Parks] │
- * └─────────────────────────────────────────────┘
- *
- * Fixed above search bar, updates with "city pulse"
+ * ┌─────────────────────────────────────────────────────────┐
+ * │  [🍝 Italian]  [🎭 Shows]  [🍺 Bars]  [🎪 Events] │
+ * └─────────────────────────────────────────────────────────┘
  */
 function HeroOptions({
   options,
   onOptionClick,
-  isLoading = false,
-  cityPulse = 'moderate'
+  onEventsClick,
+  isLoading = false
 }: HeroOptionsProps) {
   if (isLoading) {
     return (
@@ -36,8 +34,8 @@ function HeroOptions({
   }
 
   return (
-    <div className={`hero-options pulse-${cityPulse}`}>
-      {options.slice(0, 4).map((option) => (
+    <div className="hero-options">
+      {options.slice(0, 3).map((option) => (
         <button
           key={option.id}
           className="hero-option"
@@ -49,11 +47,17 @@ function HeroOptions({
         </button>
       ))}
 
-      {/* City Pulse Indicator */}
-      <div className={`pulse-indicator ${cityPulse}`}>
-        <span className="pulse-dot" />
-        <span className="pulse-text">{cityPulse}</span>
-      </div>
+      {/* Events Button */}
+      {onEventsClick && (
+        <button
+          className="hero-option events-btn"
+          onClick={onEventsClick}
+          title="Browse Events"
+        >
+          <span className="hero-emoji">🎪</span>
+          <span className="hero-label">Events</span>
+        </button>
+      )}
     </div>
   );
 }

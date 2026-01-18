@@ -53,6 +53,21 @@
   letter-spacing: 0.5px;
 }
 
+/* Events Button - Highlighted */
+.hero-option.events-btn {
+  border-color: var(--accent);
+  background: var(--accent-muted);
+}
+
+.hero-option.events-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.hero-option.events-btn:hover .hero-label {
+  color: white;
+}
+
 /* Loading Skeleton */
 .hero-options.loading {
   gap: 8px;

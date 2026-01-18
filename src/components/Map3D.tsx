@@ -456,16 +456,33 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         minzoom: 12,
       });
 
-      // Station core marker
+      // Station core marker (MBTA style)
       mapInstance.addLayer({
         id: 'stops-marker',
         type: 'circle',
         source: 'mbta-stops',
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 4, 16, 8],
-          'circle-color': '#ffffff',
-          'circle-stroke-color': VASCULAR_COLORS.positive,
-          'circle-stroke-width': 2,
+          'circle-color': '#ffffff', // MBTA red
+          'circle-stroke-color': "#000000",
+          'circle-stroke-width': 1.5,
+        },
+        minzoom: 12,
+      });
+
+      // Station "T" text (MBTA logo)
+      mapInstance.addLayer({
+        id: 'stops-marker-text',
+        type: 'symbol',
+        source: 'mbta-stops',
+        layout: {
+          'text-field': 'T',
+          'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 12, 6, 16, 10],
+          'text-allow-overlap': true,
+        },
+        paint: {
+          'text-color': '#000000',
         },
         minzoom: 12,
       });
@@ -477,23 +494,6 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       mapInstance.addSource('mbta-vehicles', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
-      });
-
-      // Vehicle shadow (ground projection)
-      mapInstance.addLayer({
-        id: 'vehicles-shadow',
-        type: 'circle',
-        source: 'mbta-vehicles',
-        paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'],
-            12, ['case', ['get', 'isBus'], 5, 10],
-            16, ['case', ['get', 'isBus'], 12, 22]
-          ],
-          'circle-color': '#000000',
-          'circle-blur': 1.2,
-          'circle-opacity': 0.2,
-          'circle-translate': [2, 2],
-        },
       });
 
       // Vehicle glow halo (route color)
@@ -664,59 +664,6 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
             }
           }]
         }
-      });
-
-      // 3D Human Model Layer
-      mapInstance.addLayer({
-        id: 'human-3d',
-        type: 'model',
-        source: 'human-location',
-        layout: {
-          'model-id': 'human-model'
-        },
-        paint: {
-          // 10x larger scale - giant visible human
-          'model-scale': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            14, ['literal', [15, 15, 15]],   // 10x at city view
-            16, ['literal', [30, 30, 30]],   // 10x at street view
-            18, ['literal', [45, 45, 45]]    // 10x when zoomed in
-          ],
-          'model-rotation': [0, 0, ['get', 'bearing']],
-          'model-emissive-strength': 1.2,
-          'model-opacity': 1
-        }
-      });
-
-      // Blue dot - current location marker (solid, prominent)
-      mapInstance.addLayer({
-        id: 'current-location-dot',
-        type: 'circle',
-        source: 'human-location',
-        paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 6, 14, 8, 16, 12, 18, 16],
-          'circle-color': '#0066ff', // Bright blue
-          'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': 2,
-          'circle-opacity': 0.9,
-        },
-        minzoom: 12,
-      });
-
-      // Pulsing halo around current location (live location indicator)
-      mapInstance.addLayer({
-        id: 'human-pulse',
-        type: 'circle',
-        source: 'human-location',
-        paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 14, 8, 18, 20],
-          'circle-color': '#0066ff', // Match the blue dot
-          'circle-blur': 1,
-          'circle-opacity': 0.3,
-        },
-        minzoom: 12,
       });
 
       // ===========================================
