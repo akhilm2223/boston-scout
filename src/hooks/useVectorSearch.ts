@@ -45,7 +45,7 @@ export function useVectorSearch(options: UseVectorSearchOptions = {}): UseVector
   const [hasMore, setHasMore] = useState(false);
   const [cursor, setCursor] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
-  const [searchType, setSearchType] = useState<SearchType>('transit');
+  const [searchType, setSearchType] = useState<SearchType>('restaurants');
 
   // Refs for debouncing and caching
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -141,6 +141,64 @@ export function useVectorSearch(options: UseVectorSearchOptions = {}): UseVector
         setTotal(data.count);
         setHasMore(data.results.length >= initialLimit);
         setCursor(data.results.length > 0 ? data.results[data.results.length - 1]._id : null);
+
+      } else if (currentSearchType === 'hidden') {
+        // Search Reddit/hidden gems - get more since no pagination
+        const response = await fetch(`${API_BASE_URL}/api/reddit/vibe-search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: searchQuery,
+            limit: 50, // Get more results at once since no pagination
+            filters: { hiddenGemsOnly: false }
+          }),
+          signal: abortControllerRef.current.signal
+        });
+
+        if (!response.ok) {
+          throw new Error('Search failed');
+        }
+
+        const data = await response.json();
+        const taggedResults: UnifiedSearchResult[] = data.results.map((r: any) => ({ ...r, type: 'reddit' as const }));
+
+        setResults(taggedResults);
+        setTotal(data.count);
+        setHasMore(false); // Reddit doesn't support pagination - show all at once
+        setCursor(null);
+
+      } else if (currentSearchType === 'all') {
+        // Search ALL categories - unified search
+        const response = await fetch(`${API_BASE_URL}/api/search/unified`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: searchQuery,
+            limit: 15 // Per category
+          }),
+          signal: abortControllerRef.current.signal
+        });
+
+        if (!response.ok) {
+          throw new Error('Search failed');
+        }
+
+        const data = await response.json();
+        
+        // Combine all results with their types already set by server
+        const allResults: UnifiedSearchResult[] = [
+          ...data.places.results,
+          ...data.events.results,
+          ...data.reddit.results
+        ];
+
+        // Sort by score if available, otherwise interleave
+        allResults.sort((a, b) => ((b as any).score || 0) - ((a as any).score || 0));
+
+        setResults(allResults);
+        setTotal(data.places.count + data.events.count + data.reddit.count);
+        setHasMore(false); // Unified search doesn't support pagination
+        setCursor(null);
       }
 
     } catch (err) {

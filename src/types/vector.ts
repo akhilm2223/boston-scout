@@ -1,7 +1,7 @@
 // Vector Search Types for Vascular Discovery Engine
 
 // Search type filter
-export type SearchType = 'transit' | 'restaurants' | 'events' | 'landmarks';
+export type SearchType = 'transit' | 'restaurants' | 'events' | 'landmarks' | 'hidden' | 'all';
 
 export interface VectorSearchResult {
   _id: string;
@@ -62,8 +62,28 @@ export interface EventSearchResult {
   type: 'event';
 }
 
-// Unified search result that can be either a place or event
-export type UnifiedSearchResult = (VectorSearchResult & { type: 'place' }) | EventSearchResult;
+// Reddit/Hidden post result
+export interface RedditSearchResult {
+  _id: string;
+  id: string;
+  title: string;
+  text?: string;
+  context?: string;
+  subreddit: string;
+  url: string;
+  ups: number;
+  num_comments: number;
+  categories?: string[];
+  locations?: string[];
+  isHiddenGem?: boolean;
+  relevanceScore?: number;
+  created_at?: string;
+  // Type discriminator
+  type: 'reddit';
+}
+
+// Unified search result that can be place, event, or reddit post
+export type UnifiedSearchResult = (VectorSearchResult & { type: 'place' }) | EventSearchResult | RedditSearchResult;
 
 export interface RedditMention {
   postId: string;

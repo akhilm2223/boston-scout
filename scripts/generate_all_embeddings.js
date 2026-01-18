@@ -116,6 +116,48 @@ function createEventText(event) {
 }
 
 /**
+ * Create semantic text for a LANDMARK
+ */
+function createLandmarkText(landmark) {
+  const parts = [];
+  
+  // Name is most important
+  parts.push(landmark.name || landmark.businessname || 'Landmark');
+  
+  // Categories
+  if (landmark.categories) {
+    const cats = typeof landmark.categories === 'string'
+      ? landmark.categories
+      : landmark.categories.join(', ');
+    parts.push(cats);
+  }
+  
+  // Type of landmark
+  if (landmark.type) {
+    parts.push(landmark.type);
+  }
+  
+  // Location context
+  if (landmark.city) parts.push(`in ${landmark.city}`);
+  if (landmark.neighborhood) parts.push(landmark.neighborhood);
+  if (landmark.address) parts.push(landmark.address);
+  
+  // Description
+  if (landmark.description) {
+    parts.push(landmark.description.substring(0, 500));
+  }
+  
+  // Rating context
+  if (landmark.rating >= 4.5) parts.push('highly rated popular tourist attraction');
+  else if (landmark.rating >= 4.0) parts.push('well reviewed destination');
+  
+  // Common landmark keywords for better matching
+  parts.push('landmark attraction sightseeing tourist destination visit boston');
+  
+  return parts.join('. ');
+}
+
+/**
  * Create semantic text for a REDDIT POST
  */
 function createRedditText(post) {
@@ -250,7 +292,8 @@ async function processCollection(collection, collectionName, textGenerator) {
 async function main() {
   console.log('╔════════════════════════════════════════════════════════════╗');
   console.log('║     BOSTON DATABASE - EMBEDDING GENERATOR                  ║');
-  console.log('║     Generating vectors for Places, Events & Reddit        ║');
+  console.log('║     Generating vectors for Places, Events, Landmarks      ║');
+  console.log('║     & Reddit                                              ║');
   console.log('╚════════════════════════════════════════════════════════════╝');
 
   if (!MONGODB_URI || !GEMINI_API_KEY) {
@@ -269,21 +312,25 @@ async function main() {
     // Get collections
     const placesCollection = db.collection('boston_places');
     const eventsCollection = db.collection('boston_events');
-    const redditCollection = db.collection('reddit_posts');
+    const landmarksCollection = db.collection('boston_landmarks');
+    const redditCollection = db.collection('hidden_events');
 
     // Count documents
     const placesCount = await placesCollection.countDocuments();
     const eventsCount = await eventsCollection.countDocuments();
+    const landmarksCount = await landmarksCollection.countDocuments();
     const redditCount = await redditCollection.countDocuments();
 
     console.log(`\n📊 Database Summary:`);
-    console.log(`   Places:  ${placesCount}`);
-    console.log(`   Events:  ${eventsCount}`);
-    console.log(`   Reddit:  ${redditCount}`);
+    console.log(`   Places:    ${placesCount}`);
+    console.log(`   Events:    ${eventsCount}`);
+    console.log(`   Landmarks: ${landmarksCount}`);
+    console.log(`   Reddit:    ${redditCount}`);
 
     const results = {
       places: { success: 0, failed: 0 },
       events: { success: 0, failed: 0 },
+      landmarks: { success: 0, failed: 0 },
       reddit: { success: 0, failed: 0 }
     };
 
@@ -305,6 +352,15 @@ async function main() {
       );
     }
 
+    // Process Landmarks
+    if (landmarksCount > 0) {
+      results.landmarks = await processCollection(
+        landmarksCollection,
+        'boston_landmarks',
+        createLandmarkText
+      );
+    }
+
     // Process Reddit Posts
     if (redditCount > 0) {
       results.reddit = await processCollection(
@@ -319,23 +375,26 @@ async function main() {
     console.log('COMPLETE!');
     console.log('═'.repeat(60));
     console.log('\n📈 Results:');
-    console.log(`   Places:  ${results.places.success} success, ${results.places.failed} failed`);
-    console.log(`   Events:  ${results.events.success} success, ${results.events.failed} failed`);
-    console.log(`   Reddit:  ${results.reddit.success} success, ${results.reddit.failed} failed`);
+    console.log(`   Places:    ${results.places.success} success, ${results.places.failed} failed`);
+    console.log(`   Events:    ${results.events.success} success, ${results.events.failed} failed`);
+    console.log(`   Landmarks: ${results.landmarks.success} success, ${results.landmarks.failed} failed`);
+    console.log(`   Reddit:    ${results.reddit.success} success, ${results.reddit.failed} failed`);
 
     // Verify final counts
     const placesWithEmbed = await placesCollection.countDocuments({ embedding: { $exists: true } });
     const eventsWithEmbed = await eventsCollection.countDocuments({ embedding: { $exists: true } });
+    const landmarksWithEmbed = await landmarksCollection.countDocuments({ embedding: { $exists: true } });
     const redditWithEmbed = await redditCollection.countDocuments({ embedding: { $exists: true } });
 
     console.log('\n✓ Documents with embeddings:');
-    console.log(`   Places:  ${placesWithEmbed}/${placesCount}`);
-    console.log(`   Events:  ${eventsWithEmbed}/${eventsCount}`);
-    console.log(`   Reddit:  ${redditWithEmbed}/${redditCount}`);
+    console.log(`   Places:    ${placesWithEmbed}/${placesCount}`);
+    console.log(`   Events:    ${eventsWithEmbed}/${eventsCount}`);
+    console.log(`   Landmarks: ${landmarksWithEmbed}/${landmarksCount}`);
+    console.log(`   Reddit:    ${redditWithEmbed}/${redditCount}`);
 
     console.log('\n📝 Next steps:');
     console.log('   1. Create vector search indexes in MongoDB Atlas');
-    console.log('   2. Index names: vibe_index (places), events_vibe_index, reddit_vibe_index');
+    console.log('   2. Index names: vibe_index (places), events_vibe_index, landmarks_vibe_index, reddit_vibe_index');
     console.log('   3. All should use path: "embedding", dimensions: 768, similarity: "cosine"');
 
   } catch (error) {

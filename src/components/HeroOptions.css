@@ -68,6 +68,51 @@
   color: white;
 }
 
+/* Landmarks Button - Blue theme */
+.hero-option.landmarks-btn {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.hero-option.landmarks-btn:hover {
+  background: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.hero-option.landmarks-btn:hover .hero-label {
+  color: white;
+}
+
+/* Hidden Gems Button - Gold/Diamond theme */
+.hero-option.hidden-btn {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.hero-option.hidden-btn:hover {
+  background: #f59e0b;
+  border-color: #f59e0b;
+}
+
+.hero-option.hidden-btn:hover .hero-label {
+  color: white;
+}
+
+/* All Button - Rainbow/Multi theme */
+.hero-option.all-btn {
+  border-color: #10b981;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.1));
+}
+
+.hero-option.all-btn:hover {
+  background: linear-gradient(135deg, #10b981, #3b82f6);
+  border-color: #10b981;
+}
+
+.hero-option.all-btn:hover .hero-label {
+  color: white;
+}
+
 /* Loading Skeleton */
 .hero-options.loading {
   gap: 8px;

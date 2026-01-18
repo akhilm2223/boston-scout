@@ -61,7 +61,7 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
   } = useVectorSearch({ debounceMs: 300, initialLimit: 20 });
 
   // Check if any filter is active
-  const hasActiveFilters = minRating > 0 || priceLevel !== null || searchType !== 'transit';
+  const hasActiveFilters = minRating > 0 || priceLevel !== null || searchType !== 'restaurants';
 
   // City pulse hook for hero options
   const {
@@ -90,9 +90,9 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
     }
   }, [activeSearchQuery, query, setQuery]);
 
-  // Initial load - only search if not transit mode
+  // Initial load - search for popular places on startup
   useEffect(() => {
-    if (results.length === 0 && !query && searchType !== 'transit') {
+    if (results.length === 0 && !query && searchType === 'restaurants') {
       search('popular restaurant boston');
     }
   }, [results.length, query, search, searchType]);
@@ -112,7 +112,7 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
    * Handle hero option click
    */
   const handleHeroClick = useCallback((option: HeroOption) => {
-    setSearchType('places');
+    setSearchType('restaurants');
     setQuery(option.query);
   }, [setQuery, setSearchType]);
 
@@ -122,6 +122,30 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
   const handleEventsClick = useCallback(() => {
     setSearchType('events');
     search('upcoming events boston');
+  }, [setSearchType, search]);
+
+  /**
+   * Handle Landmarks button click - switch to landmarks search
+   */
+  const handleLandmarksClick = useCallback(() => {
+    setSearchType('landmarks');
+    search('famous landmarks attractions boston');
+  }, [setSearchType, search]);
+
+  /**
+   * Handle Hidden button click - show Reddit hidden gems
+   */
+  const handleHiddenClick = useCallback(() => {
+    setSearchType('hidden');
+    search('hidden gem local secret boston');
+  }, [setSearchType, search]);
+
+  /**
+   * Handle All button click - search everything
+   */
+  const handleAllClick = useCallback(() => {
+    setSearchType('all');
+    search('popular boston');
   }, [setSearchType, search]);
 
   /**
@@ -297,6 +321,9 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
         options={heroOptions}
         onOptionClick={handleHeroClick}
         onEventsClick={handleEventsClick}
+        onLandmarksClick={handleLandmarksClick}
+        onHiddenClick={handleHiddenClick}
+        onAllClick={handleAllClick}
         isLoading={isPulseLoading}
       />
 

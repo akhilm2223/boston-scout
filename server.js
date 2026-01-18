@@ -891,14 +891,15 @@ app.post('/api/events/vibe-search', async (req, res) => {
 });
 
 // ============================================
-// REDDIT VECTOR SEARCH  
+// REDDIT/HIDDEN EVENTS TEXT SEARCH  
+// (No vector index needed - uses text search)
 // ============================================
 
 let redditCollection;
 
 /**
  * POST /api/reddit/vibe-search
- * Semantic vector search for reddit posts
+ * Text search for reddit/hidden events posts (no vector index required)
  */
 app.post('/api/reddit/vibe-search', async (req, res) => {
   const startTime = Date.now();
@@ -906,7 +907,7 @@ app.post('/api/reddit/vibe-search', async (req, res) => {
   try {
     // Initialize reddit collection if not done
     if (!redditCollection) {
-      redditCollection = db.collection('reddit_posts');
+      redditCollection = db.collection('hidden_events');
     }
 
     const { query, limit = 20, filters = {} } = req.body;
@@ -915,69 +916,32 @@ app.post('/api/reddit/vibe-search', async (req, res) => {
       return res.status(400).json({ error: 'Search query is required' });
     }
 
-    const queryEmbedding = await getQueryEmbedding(query);
-    let results;
+    // Use text search (no vector index needed)
+    console.log('[Reddit] Text search for:', query);
+    const searchTerms = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+    const regexPattern = searchTerms.length > 0 ? searchTerms.join('|') : query;
 
-    if (queryEmbedding) {
-      const pipeline = [
-        {
-          $vectorSearch: {
-            index: 'reddit_vibe_index',
-            path: 'embedding',
-            queryVector: queryEmbedding,
-            numCandidates: 100,
-            limit: limit
-          }
-        },
-        {
-          $addFields: {
-            score: { $meta: 'vectorSearchScore' }
-          }
-        }
-      ];
+    const matchQuery = {
+      $or: [
+        { title: { $regex: regexPattern, $options: 'i' } },
+        { text: { $regex: regexPattern, $options: 'i' } },
+        { context: { $regex: regexPattern, $options: 'i' } },
+        { categories: { $elemMatch: { $regex: regexPattern, $options: 'i' } } }
+      ]
+    };
 
-      // Hidden gems filter
-      if (filters.hiddenGemsOnly) {
-        pipeline.push({ $match: { isHiddenGem: true } });
-      }
+    if (filters.hiddenGemsOnly) matchQuery.isHiddenGem = true;
+    if (filters.subreddit) matchQuery.subreddit = filters.subreddit;
+    if (filters.minUpvotes) matchQuery.ups = { $gte: filters.minUpvotes };
 
-      // Subreddit filter
-      if (filters.subreddit) {
-        pipeline.push({ $match: { subreddit: filters.subreddit } });
-      }
+    const results = await redditCollection
+      .find(matchQuery)
+      .sort({ ups: -1, relevanceScore: -1 })
+      .limit(limit)
+      .project({ embedding: 0 })
+      .toArray();
 
-      // Min upvotes filter
-      if (filters.minUpvotes) {
-        pipeline.push({ $match: { ups: { $gte: filters.minUpvotes } } });
-      }
-
-      pipeline.push({ $project: { embedding: 0 } });
-
-      results = await redditCollection.aggregate(pipeline).toArray();
-    } else {
-      // Fallback to text search
-      console.log('Falling back to text search for reddit:', query);
-      const searchTerms = query.toLowerCase().split(/\s+/).filter(t => t.length > 2);
-      const regexPattern = searchTerms.join('|');
-
-      const matchQuery = {
-        $or: [
-          { title: { $regex: regexPattern, $options: 'i' } },
-          { text: { $regex: regexPattern, $options: 'i' } },
-          { selftext: { $regex: regexPattern, $options: 'i' } }
-        ]
-      };
-
-      if (filters.hiddenGemsOnly) matchQuery.isHiddenGem = true;
-      if (filters.subreddit) matchQuery.subreddit = filters.subreddit;
-
-      results = await redditCollection
-        .find(matchQuery)
-        .sort({ ups: -1 })
-        .limit(limit)
-        .project({ embedding: 0 })
-        .toArray();
-    }
+    console.log(`[Reddit] Found ${results.length} results for "${query}"`);
 
     res.json({
       results,
@@ -999,7 +963,7 @@ app.post('/api/reddit/vibe-search', async (req, res) => {
 app.get('/api/reddit/hidden-gems', async (req, res) => {
   try {
     if (!redditCollection) {
-      redditCollection = db.collection('reddit_posts');
+      redditCollection = db.collection('hidden_events');
     }
 
     const { limit = 10 } = req.query;
@@ -1042,7 +1006,7 @@ app.post('/api/search/unified', async (req, res) => {
 
     // Initialize reddit collection
     if (!redditCollection) {
-      redditCollection = db.collection('reddit_posts');
+      redditCollection = db.collection('hidden_events');
     }
 
     const queryEmbedding = await getQueryEmbedding(query);
@@ -1067,14 +1031,14 @@ app.post('/api/search/unified', async (req, res) => {
         ]).toArray()
         : eventsCollection.find({ title: { $regex: query, $options: 'i' } }).limit(limit).project({ embedding: 0 }).toArray().then(r => r.map(e => ({ ...e, type: 'event' }))),
 
-      // Reddit search
-      queryEmbedding
-        ? redditCollection.aggregate([
-          { $vectorSearch: { index: 'reddit_vibe_index', path: 'embedding', queryVector: queryEmbedding, numCandidates: 50, limit: limit } },
-          { $addFields: { score: { $meta: 'vectorSearchScore' }, type: 'reddit' } },
-          { $project: { embedding: 0 } }
-        ]).toArray()
-        : redditCollection.find({ title: { $regex: query, $options: 'i' } }).limit(limit).project({ embedding: 0 }).toArray().then(r => r.map(p => ({ ...p, type: 'reddit' })))
+      // Reddit search (always text search - no vector index)
+      redditCollection.find({
+        $or: [
+          { title: { $regex: query, $options: 'i' } },
+          { text: { $regex: query, $options: 'i' } },
+          { context: { $regex: query, $options: 'i' } }
+        ]
+      }).sort({ ups: -1 }).limit(limit).project({ embedding: 0 }).toArray().then(r => r.map(p => ({ ...p, type: 'reddit' })))
     ]);
 
     res.json({

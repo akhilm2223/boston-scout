@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, CSSProperties } from 'react';
 import { List, ListImperativeAPI } from 'react-window';
 import VibePlaceCard from './VibePlaceCard';
-import type { VectorSearchResult, EventSearchResult, UnifiedSearchResult } from '../types/vector';
+import type { VectorSearchResult, EventSearchResult, RedditSearchResult, UnifiedSearchResult } from '../types/vector';
 import './VirtualDiscoveryList.css';
 
 const ITEM_HEIGHT = 120;
@@ -39,7 +39,7 @@ interface RowComponentProps extends RowProps {
 }
 
 /**
- * Event card component for rendering events
+ * Event card component for rendering events - matches VibePlaceCard style
  */
 function EventCard({ 
   event, 
@@ -56,6 +56,9 @@ function EventCard({
   onClick: () => void;
   style: CSSProperties;
 }) {
+  // Unused but available for future
+  void onSkip;
+
   const formatDate = (dateStr: string) => {
     try {
       const date = new Date(dateStr);
@@ -71,49 +74,184 @@ function EventCard({
     }
   };
 
+  // Generate image URL - use event image or fallback to category-based Unsplash
+  const getImageUrl = () => {
+    if (event.image_url) return event.image_url;
+    
+    // Category-based fallback images
+    const category = (event.category || '').toLowerCase();
+    let searchTerm = 'concert,event,boston';
+    
+    if (category.includes('music') || category.includes('concert')) {
+      searchTerm = 'concert,live-music,performance';
+    } else if (category.includes('sport')) {
+      searchTerm = 'sports,stadium,game';
+    } else if (category.includes('art') || category.includes('museum')) {
+      searchTerm = 'art,gallery,exhibition';
+    } else if (category.includes('food') || category.includes('drink')) {
+      searchTerm = 'food,festival,dining';
+    } else if (category.includes('comedy')) {
+      searchTerm = 'comedy,standup,theater';
+    } else if (category.includes('theater') || category.includes('theatre')) {
+      searchTerm = 'theater,stage,performance';
+    }
+    
+    return `https://source.unsplash.com/400x300/?${searchTerm}`;
+  };
+
+  const imageUrl = getImageUrl();
+
   return (
     <div 
-      className={`vibe-card event-card ${isAdded ? 'added' : ''}`} 
-      style={style}
+      className={`vibe-place-card event-card ${isAdded ? 'added' : ''}`} 
+      style={{
+        ...style,
+        '--card-image': `url(${imageUrl})`
+      } as CSSProperties}
       onClick={onClick}
     >
-      <div className="vibe-card-content">
-        <div className="vibe-card-header">
-          <span className="event-badge">🎭 Event</span>
+      {/* Image Section (40% width) */}
+      <div className="card-image-section">
+        <div className="card-image" />
+        {/* Event type badge on image */}
+        <div className="event-type-badge">🎭 Event</div>
+      </div>
+
+      {/* Content Section (60% width) */}
+      <div className="card-content-section">
+        {/* Title */}
+        <h3 className="card-title">{event.title}</h3>
+
+        {/* Meta Row: Date & Venue */}
+        <div className="card-meta">
+          <span className="meta-date">📅 {formatDate(event.start_time)}</span>
+        </div>
+
+        {/* Venue as address */}
+        <p className="card-address">📍 {event.venue.name}</p>
+
+        {/* Category & Price as badge */}
+        <div className="event-info-row">
           {event.category && (
-            <span className="event-category">{event.category}</span>
+            <span className="event-category-badge">{event.category}</span>
+          )}
+          {event.price && (
+            <span className="event-price-badge">{event.price}</span>
           )}
         </div>
-        <h3 className="vibe-card-title">{event.title}</h3>
-        <div className="vibe-card-meta">
-          <span className="event-date">📅 {formatDate(event.start_time)}</span>
-          <span className="event-venue">📍 {event.venue.name}</span>
-        </div>
-        {event.price && (
-          <span className="event-price">{event.price}</span>
-        )}
       </div>
-      <div className="vibe-card-actions">
-        {!isAdded ? (
-          <>
-            <button 
-              className="action-btn add-btn" 
-              onClick={(e) => { e.stopPropagation(); onAdd(); }}
-              title="Add to itinerary"
-            >
-              +
-            </button>
-            <button 
-              className="action-btn skip-btn" 
-              onClick={(e) => { e.stopPropagation(); onSkip(); }}
-              title="Skip"
-            >
-              ×
-            </button>
-          </>
-        ) : (
-          <span className="added-badge">✓ Added</span>
+
+      {/* Action Button */}
+      <div className="card-actions">
+        <button
+          className={`action-btn add ${isAdded ? 'added' : ''}`}
+          onClick={(e) => { e.stopPropagation(); onAdd(); }}
+          disabled={isAdded}
+        >
+          {isAdded ? 'Added' : 'Add'}
+        </button>
+      </div>
+
+      {/* Added Badge */}
+      {isAdded && (
+        <div className="added-badge">
+          <span>✓</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Reddit card component for rendering Reddit posts
+ */
+function RedditCard({ 
+  post, 
+  isAdded, 
+  onAdd, 
+  onSkip, 
+  onClick, 
+  style 
+}: { 
+  post: RedditSearchResult;
+  isAdded: boolean;
+  onAdd: () => void;
+  onSkip: () => void;
+  onClick: () => void;
+  style: CSSProperties;
+}) {
+  void onSkip;
+
+  // Generate image based on categories
+  const getImageUrl = () => {
+    const categories = post.categories || [];
+    let searchTerm = 'boston,city,hidden';
+    
+    if (categories.some(c => c.toLowerCase().includes('food'))) {
+      searchTerm = 'restaurant,food,hidden-gem';
+    } else if (categories.some(c => c.toLowerCase().includes('bar') || c.toLowerCase().includes('nightlife'))) {
+      searchTerm = 'bar,cocktail,nightlife';
+    } else if (categories.some(c => c.toLowerCase().includes('music') || c.toLowerCase().includes('concert'))) {
+      searchTerm = 'concert,live-music,venue';
+    } else if (categories.some(c => c.toLowerCase().includes('outdoor') || c.toLowerCase().includes('park'))) {
+      searchTerm = 'park,nature,outdoor,boston';
+    }
+    
+    return `https://source.unsplash.com/400x300/?${searchTerm}`;
+  };
+
+  const imageUrl = getImageUrl();
+
+  return (
+    <div 
+      className={`vibe-place-card reddit-card ${isAdded ? 'added' : ''}`} 
+      style={{
+        ...style,
+        '--card-image': `url(${imageUrl})`
+      } as CSSProperties}
+      onClick={onClick}
+    >
+      {/* Image Section */}
+      <div className="card-image-section">
+        <div className="card-image" />
+        <div className="reddit-type-badge">💎 Hidden</div>
+      </div>
+
+      {/* Content Section */}
+      <div className="card-content-section">
+        <h3 className="card-title">{post.title}</h3>
+
+        <div className="card-meta">
+          <span className="meta-subreddit">r/{post.subreddit}</span>
+          <span className="meta-upvotes">⬆️ {post.ups}</span>
+          <span className="meta-comments">💬 {post.num_comments}</span>
+        </div>
+
+        {post.text && (
+          <p className="card-address">{post.text.substring(0, 80)}...</p>
         )}
+
+        <div className="reddit-info-row">
+          {post.isHiddenGem && (
+            <span className="hidden-gem-badge">💎 Hidden Gem</span>
+          )}
+          {post.categories?.slice(0, 2).map((cat, i) => (
+            <span key={i} className="reddit-category-badge">{cat}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* Action - Open Reddit */}
+      <div className="card-actions">
+        <a
+          href={post.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="action-btn view-btn"
+          onClick={(e) => e.stopPropagation()}
+        >
+          View
+        </a>
       </div>
     </div>
   );
@@ -151,6 +289,21 @@ function Row({ index, style, items, addedIds, onAddItem, onSkipItem, onItemClick
         onAdd={() => onAddItem(item)}
         onSkip={() => onSkipItem(item)}
         onClick={() => onItemClick(item)}
+        style={style}
+      />
+    );
+  }
+
+  // Render reddit card for reddit posts
+  if (item.type === 'reddit') {
+    return (
+      <RedditCard
+        key={item._id}
+        post={item as RedditSearchResult}
+        isAdded={addedIds.has(item._id)}
+        onAdd={() => onAddItem(item)}
+        onSkip={() => onSkipItem(item)}
+        onClick={() => window.open((item as RedditSearchResult).url, '_blank')}
         style={style}
       />
     );
