@@ -2,7 +2,8 @@ import { useState, useCallback, useEffect } from 'react';
 import Map3D from './components/Map3D';
 import MapErrorBoundary from './components/MapErrorBoundary';
 import ItineraryPanel from './components/ItineraryPanel';
-import { ItineraryEvent } from './types';
+import EventSearchPanel, { ItineraryEvent } from './components/EventSearchPanel';
+import WelcomeScreen from './components/WelcomeScreen';
 import './App.css';
 
 export interface CitySettings {
@@ -78,6 +79,31 @@ function App() {
 
   // Itinerary State
   const [itineraryEvents, setItineraryEvents] = useState<ItineraryEvent[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeSearchQuery, setActiveSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(true);
+
+  const handleSearchSubmit = useCallback(() => {
+    if (searchQuery.trim()) {
+      setActiveSearchQuery(searchQuery);
+      setIsSearching(true);
+      // Reset searching state after a timeout to simulate loading "handoff"
+      setTimeout(() => setIsSearching(false), 1000);
+    }
+  }, [searchQuery]);
+
+  const handleDisplayStart = useCallback((mode: 'voice' | 'chat') => {
+    setShowWelcome(false);
+    // You could use the 'mode' here to trigger specific helper states if needed
+    if (mode === 'voice') {
+      // Trigger voice assistant logic later
+    }
+  }, []);
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSearchSubmit();
+  };
 
   const handleLocationClick = useCallback((location: [number, number], name: string) => {
     setSelectedLocation({ location, name });
@@ -94,10 +120,75 @@ function App() {
     setItineraryEvents(prev => prev.filter(e => e.id !== eventId));
   }, []);
 
+  if (showWelcome) {
+    return <WelcomeScreen onStart={handleDisplayStart} />;
+  }
+
+
   return (
     <div className={`app ${isDarkMode ? 'dark' : 'light'}`}>
+      {/* App Header */}
+      <div className="app-header">
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          color: 'white',
+          fontFamily: "'Inter', sans-serif"
+        }}>
+          {/* Logo Mark */}
+          <div style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '8px',
+            background: 'rgba(0, 255, 255, 0.1)',
+            border: '1px solid rgba(0, 255, 255, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 0 10px rgba(0, 255, 255, 0.1)'
+          }}>
+            <div style={{
+              width: '8px',
+              height: '8px',
+              background: '#00ffff',
+              borderRadius: '50%',
+              boxShadow: '0 0 8px #00ffff'
+            }} />
+          </div>
+
+          {/* Brand Name */}
+          <span style={{
+            fontSize: '1.1rem',
+            fontWeight: 800,
+            letterSpacing: '1.5px',
+            textTransform: 'uppercase',
+            background: 'linear-gradient(90deg, #fff, #ccc)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            textShadow: '0 0 15px rgba(255,255,255,0.2)'
+          }}>
+            Boston Visit
+          </span>
+        </div>
+      </div>
       {/* Left Panel: Results + Itinerary Side by Side */}
       <div className="app-left-panel">
+        <div className="dual-panel-container">
+          {/* Discovery Column (4-Card Grid) */}
+          <div className="discovery-column">
+            <EventSearchPanel
+              onAddToItinerary={handleAddToItinerary}
+              onLocationClick={handleLocationClick}
+              activeSearchQuery={activeSearchQuery}
+            />
+          </div>
+
+          {/* Itinerary Column */}
+          <div className="itinerary-column">
+            <div className="column-header">
+              <h2>Your Itinerary</h2>
+            </div>
             <ItineraryPanel
               onLocationClick={handleLocationClick}
               customEvents={itineraryEvents}
@@ -108,6 +199,29 @@ function App() {
               walkingPreferences={walkingPreferences}
               onWalkingPreferencesChange={setWalkingPreferences}
             />
+          </div>
+        </div>
+
+        {/* Unified Search Bar */}
+        <div className="global-search-container">
+          <div className="search-wrapper">
+            <input
+              type="text"
+              className="global-search-input"
+              placeholder="Ask for experiences... (e.g. 'romantic dinner' or 'jazz concert')"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyPress={handleKeyPress}
+            />
+            <button
+              className="global-search-btn"
+              onClick={handleSearchSubmit}
+              disabled={isSearching}
+            >
+              {isSearching ? '...' : '→'}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Right Panel: 3D Map */}
