@@ -9,6 +9,7 @@ import { ItineraryEvent } from "../types";
 import type {
 	VectorSearchResult,
 	EventSearchResult,
+	LandmarkSearchResult,
 	HeroOption,
 	UnifiedSearchResult,
 } from "../types/vector";
@@ -201,6 +202,24 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(
 						sentiment: "positive",
 						category: "event",
 					};
+				} else if (item.type === "landmark") {
+					const landmark = item as LandmarkSearchResult;
+					event = {
+						id: landmark._id,
+						name: landmark.name,
+						location: { lat: landmark.lat, lng: landmark.lng },
+						time: "",
+						duration: "1-2 hours",
+						vibe:
+							landmark.primary_category ||
+							landmark.categories?.[0] ||
+							"sightseeing",
+						sentiment:
+							landmark.rating && landmark.rating >= 4.5
+								? "positive"
+								: "neutral",
+						category: "attraction",
+					};
 				} else {
 					const place = item as VectorSearchResult;
 					event = {
@@ -233,10 +252,14 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(
 		 */
 		const handleSkipItem = useCallback((item: UnifiedSearchResult) => {
 			// Could track skipped items for better recommendations
-			const name =
-				item.type === "event"
-					? (item as EventSearchResult).title
-					: (item as VectorSearchResult).businessname;
+			let name: string;
+			if (item.type === "event") {
+				name = (item as EventSearchResult).title;
+			} else if (item.type === "landmark") {
+				name = (item as LandmarkSearchResult).name;
+			} else {
+				name = (item as VectorSearchResult).businessname;
+			}
 			console.log("Skipped:", name);
 		}, []);
 
@@ -251,6 +274,14 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(
 						onLocationClick(
 							[event.venue.lng, event.venue.lat],
 							event.title,
+						);
+					}
+				} else if (item.type === "landmark") {
+					const landmark = item as LandmarkSearchResult;
+					if (landmark.lng && landmark.lat) {
+						onLocationClick(
+							[landmark.lng, landmark.lat],
+							landmark.name,
 						);
 					}
 				} else {
