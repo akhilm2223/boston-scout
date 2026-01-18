@@ -974,9 +974,9 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         });
 
         const photoHTML = props.photoName ?
-          `<div class="popup-photo" style="width: 100%; height: 140px; background: linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%); border-radius: 8px 8px 0 0; margin: -12px -16px 12px -16px; position: relative; overflow: hidden;">
+          `<div class="popup-photo">
             <img src="${photoUrl}" 
-                 style="width: 100%; height: 100%; object-fit: cover;" 
+                 alt="${props.name}"
                  onerror="this.parentElement.style.background='linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%)'; this.style.display='none';" />
             <div style="position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); padding: 5px 10px; border-radius: 6px; font-size: 12px; color: #000; font-weight: 700; border: 1px solid #e5e7eb;">
               ${starsHTML} <span style="margin-left: 4px;">${rating.toFixed(1)}</span>
@@ -993,10 +993,10 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         );
 
         const popupHTML = `
-          <div class="restaurant-popup" style="min-width: 280px; max-width: 320px; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;">
+          <div class="restaurant-popup">
             ${photoHTML}
             
-            <div style="padding: ${photoHTML ? '0' : '4px 0'};">
+            <div>
               <h3 style="margin: 0 0 10px 0; font-size: 18px; font-weight: 700; color: #000; line-height: 1.3; letter-spacing: -0.3px;">
                 ${props.name}
               </h3>
