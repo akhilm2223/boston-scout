@@ -30,32 +30,32 @@ const BOSTON_CENTER: [number, number] = [-71.0589, 42.3601];
 
 // Vascular Digital Twin color palette - MLK Weekend Edition
 const VASCULAR_COLORS = {
-	// Healthy flow - Electric Cyan
-	healthyCyan: "#00f3ff",
-	healthyCyanCore: "#ffffff",
-	healthyCyanGlow: "#00b8cc",
+  // Healthy flow - Electric Cyan
+  healthyCyan: "#00f3ff",
+  healthyCyanCore: "#ffffff",
+  healthyCyanGlow: "#00b8cc",
 
-	// Delayed/stressed flow - Deep Orange/Red
-	delayCoral: "#ff3d00",
-	delayCoralCore: "#fff4e6",
-	delayCoralGlow: "#ff6b35",
+  // Delayed/stressed flow - Deep Orange/Red
+  delayCoral: "#ff3d00",
+  delayCoralCore: "#fff4e6",
+  delayCoralGlow: "#ff6b35",
 
-	// Sentiment colors for building underglow
-	positive: "#00f3ff", // Cyan (parent-friendly, positive)
-	negative: "#ffb347", // Amber (crowded, tourist-heavy)
-	neutral: "#4a6080", // Cool gray
+  // Sentiment colors for building underglow
+  positive: "#00f3ff", // Cyan (parent-friendly, positive)
+  negative: "#ffb347", // Amber (crowded, tourist-heavy)
+  neutral: "#4a6080", // Cool gray
 
-	// Commuter rail colors
-	commuterRailColor: "#56236E", // Brown/dark red for commuter rail
-	commuterRailGlow: "#A0522D", // Sienna for glow
+  // Commuter rail colors
+  commuterRailColor: "#56236E", // Brown/dark red for commuter rail
+  commuterRailGlow: "#A0522D", // Sienna for glow
 
-	// Amtrak colors
-	amtrakColor: "#1e40af", // Deep blue for Amtrak
+  // Amtrak colors
+  amtrakColor: "#1e40af", // Deep blue for Amtrak
 
-	// Dark atmosphere
-	fogColor: "#0a0a0f",
-	horizonColor: "#1a1a2e",
-	spaceColor: "#000000",
+  // Dark atmosphere
+  fogColor: "#0a0a0f",
+  horizonColor: "#1a1a2e",
+  spaceColor: "#000000",
 };
 
 // Interpolate color based on speed (fast = blue-white, slow = amber)
@@ -852,7 +852,10 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         const endTime = formatEventTime(props.endTime);
 
         const photoUrl = props.photoName ?
-          `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${props.photoName}&key=${GOOGLE_MAPS_API_KEY}` : '';
+          (props.photoName.startsWith('http') ? props.photoName :
+            props.photoName.startsWith('places/') ?
+              `https://places.googleapis.com/v1/${props.photoName}/media?maxHeightPx=400&maxWidthPx=400&key=${GOOGLE_MAPS_API_KEY}` :
+              `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${props.photoName}&key=${GOOGLE_MAPS_API_KEY}`) : '';
 
         const popupHTML = `
           <div class="event-popup" style="min-width: 280px; max-width: 320px; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;">
@@ -958,7 +961,10 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
 
         // Photo URL (black and white gradient fallback)
         const photoUrl = props.photoName ?
-          `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${props.photoName}&key=${GOOGLE_MAPS_API_KEY}` : '';
+          (props.photoName.startsWith('http') ? props.photoName :
+            props.photoName.startsWith('places/') ?
+              `https://places.googleapis.com/v1/${props.photoName}/media?maxHeightPx=400&maxWidthPx=400&key=${GOOGLE_MAPS_API_KEY}` :
+              `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${props.photoName}&key=${GOOGLE_MAPS_API_KEY}`) : '';
 
         console.log('Generating Photo URL:', {
           name: props.name,
@@ -970,7 +976,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         const photoHTML = props.photoName ?
           `<div class="popup-photo" style="width: 100%; height: 140px; background: linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%); border-radius: 8px 8px 0 0; margin: -12px -16px 12px -16px; position: relative; overflow: hidden;">
             <img src="${photoUrl}" 
-                 style="width: 100%; height: 100%; object-fit: cover; filter: grayscale(100%);" 
+                 style="width: 100%; height: 100%; object-fit: cover;" 
                  onerror="this.parentElement.style.background='linear-gradient(135deg, #1a1a1a 0%, #4a4a4a 100%)'; this.style.display='none';" />
             <div style="position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); padding: 5px 10px; border-radius: 6px; font-size: 12px; color: #000; font-weight: 700; border: 1px solid #e5e7eb;">
               ${starsHTML} <span style="margin-left: 4px;">${rating.toFixed(1)}</span>
@@ -1630,7 +1636,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       'mbta-subway-3d', 'vehicles-glow', // New 3D layers
       'ferry-body', 'ferry-label'
     ];
-    
+
     layers.forEach(layer => {
       try {
         if (map.current?.getLayer(layer)) {
@@ -1646,12 +1652,12 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
   // Update user location marker when location changes
   useEffect(() => {
     if (!map.current || !isLoaded) return;
-    
+
     const source = map.current.getSource('human-location') as mapboxgl.GeoJSONSource;
     if (!source) return;
 
     const location = userLocation || [-71.0657, 42.3550]; // Default to Boston Common if no location
-    
+
     source.setData({
       type: 'FeatureCollection',
       features: [{
@@ -1680,7 +1686,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       'restaurants-marker',
       'restaurants-label'
     ];
-    
+
     layers.forEach(layer => {
       try {
         if (map.current?.getLayer(layer)) {
@@ -1704,7 +1710,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       'events-marker',
       'events-label'
     ];
-    
+
     layers.forEach(layer => {
       try {
         if (map.current?.getLayer(layer)) {
