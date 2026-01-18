@@ -31,7 +31,7 @@ export interface Restaurant {
 // Fetch all restaurants from MongoDB
 export async function fetchRestaurants(): Promise<Restaurant[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/restaurants`);
+    const response = await fetch(`${API_BASE_URL}/api/places`);
     if (!response.ok) throw new Error(`API error: ${response.status}`);
     
     const data = await response.json();
