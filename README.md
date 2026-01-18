@@ -1,34 +1,80 @@
-# Boston 3D Transit Visualization
+# Boston Scout - 3D Transit Visualization
 
-Real-time 3D visualization of Boston's MBTA transit system using Mapbox GL and the MBTA V3 API.
+Real-time 3D visualization of Boston's MBTA transit system with restaurants, events, and AI-powered itinerary planning.
+
+![Boston Scout](https://img.shields.io/badge/React-18-blue) ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue) ![Mapbox](https://img.shields.io/badge/Mapbox-GL-green)
 
 ## Features
 
+### Transit Tracking
 - **Real-time vehicle tracking** - Buses, subway, light rail, commuter rail, and ferries
-- **3D city visualization** - Dark cyberpunk-style map with glowing buildings
-- **Live track lines** - Actual MBTA route shapes with route colors
+- **Live track lines** - Actual MBTA route shapes with authentic route colors
 - **System stress indicator** - Shows overall transit occupancy
-- **Weather overlay** - Rain, snow, fog effects
-- **Coverage area** - Boston to Worcester
+- **Vascular flow visualization** - Cyan for healthy flow, orange for delays
+
+### 3D Visualization
+- **Cyberpunk-style map** - Dark theme with glowing buildings
+- **3D building extrusions** - Interactive building highlights
+- **Weather overlays** - Rain, snow, fog effects
+- **Helicopter tour mode** - Automated city flyover
+
+### Places & Discovery
+- **Restaurants** - Rating-based markers with filtering
+- **Events** - Local happenings from Reddit and other sources
+- **Vector search** - AI-powered semantic search for places
+
+### AI Features
+- **Gemini-powered itinerary optimizer** - Smart trip planning
+- **Push-to-talk voice control** - Hands-free map navigation
+- **Natural language commands** - Voice-driven interactions
+
+### UI/UX
+- **Split-screen dashboard** - Map with itinerary panel
+- **Interactive popups** - Click stops for details, images, and times
+- **Welcome screen** - Guided onboarding experience
 
 ## Tech Stack
 
-- React + TypeScript + Vite
-- Mapbox GL JS (3D maps)
-- MBTA V3 API (real-time transit data)
+- **Frontend**: React 18 + TypeScript + Vite
+- **Maps**: Mapbox GL JS (3D)
+- **Transit Data**: MBTA V3 API
+- **AI**: Google Gemini, ElevenLabs
+- **Database**: MongoDB with vector search
+- **Backend**: Node.js/Express
+
+## Color Scheme
+
+| Element | Color | Hex |
+|---------|-------|-----|
+| Healthy Transit | Electric Cyan | `#00f3ff` |
+| Delayed Transit | Deep Orange | `#ff3d00` |
+| Excellent Rating (4.5+) | Green | `#10b981` |
+| Great Rating (4.0-4.5) | Blue | `#3b82f6` |
+| Good Rating (3.5-4.0) | Amber | `#f59e0b` |
+| Average Rating (<3.5) | Red | `#ef4444` |
 
 ## Setup
 
-1. Clone the repo
+1. Clone the repo:
+   ```bash
+   git clone https://github.com/akhilm2223/boston-scout.git
+   cd boston-scout
+   ```
+
 2. Install dependencies:
    ```bash
    npm install
    ```
-3. Create `.env` file:
-   ```
+
+3. Create `.env` file (see `.env.template`):
+   ```env
    VITE_MAPBOX_TOKEN=your_mapbox_token
    VITE_MBTA_API_KEY=your_mbta_api_key
+   MONGODB_URI=your_mongodb_uri
+   GEMINI_API_KEY=your_gemini_key
+   ELEVENLABS_API_KEY=your_elevenlabs_key
    ```
+
 4. Run dev server:
    ```bash
    npm run dev
@@ -36,55 +82,17 @@ Real-time 3D visualization of Boston's MBTA transit system using Mapbox GL and t
 
 ## API Keys
 
-- **Mapbox**: Get a free token at [mapbox.com](https://mapbox.com)
-- **MBTA**: Get a free API key at [api-v3.mbta.com](https://api-v3.mbta.com)
+- **Mapbox**: [mapbox.com](https://mapbox.com)
+- **MBTA**: [api-v3.mbta.com](https://api-v3.mbta.com)
+- **Google Gemini**: [ai.google.dev](https://ai.google.dev)
+- **ElevenLabs**: [elevenlabs.io](https://elevenlabs.io)
+
+## Contributors
+
+- [@kalxed](https://github.com/kalxed) - Kai Davidson
+- [@dormfinder4-lab](https://github.com/dormfinder4-lab)
+- [@ivan5355](https://github.com/ivan5355)
 
 ## License
 
 MIT
-
-Let me check what colors are used in the map for different elements:
-
-Perfect! Here's a breakdown of all the colors used in your Boston 3D map:
-
-## Color Scheme Breakdown
-
-### **Restaurant Markers** (Rating-based)
-- 🟢 **Green** `#10b981` - Excellent (4.5+ stars)
-- 🔵 **Blue** `#3b82f6` - Great (4.0-4.5 stars)
-- 🟠 **Amber** `#f59e0b` - Good (3.5-4.0 stars)
-- 🔴 **Red** `#ef4444` - Average (<3.5 stars)
-- ⚫ **Gray** `#888888` - No rating
-
-### **Transit System** (Vascular Flow Colors)
-
-**Healthy Flow (Fast trains):**
-- 💠 **Electric Cyan** `#00f3ff` - Main trail color
-- ⚪ **White** `#ffffff` - Core/brightest point
-- 🔷 **Cyan Glow** `#00b8cc` - Outer glow
-
-**Delayed/Slow Flow:**
-- 🟠 **Deep Orange** `#ff3d00` - Trail color
-- 🟡 **Cream** `#fff4e6` - Core
-- 🔶 **Orange Glow** `#ff6b35` - Outer glow
-
-### **MBTA Stations**
-- 💠 **Cyan** `#00f3ff` - Station markers & glow
-- ⚪ **White** `#ffffff` - Station core
-
-### **Buildings**
-- ⚫ **Pure Black** `#000000` - Default buildings
-- 💠 **Electric Cyan** `#00f3ff` - Selected/highlighted building
-- 💠 **Cyan Underglow** `#00f3ff` - Floor lighting (positive sentiment)
-
-### **UI Controls**
-- 💠 **Cyan** `#00f3ff` - Active toggle buttons, borders
-- ⚫ **Dark** `rgba(10, 10, 15, 0.85)` - Button backgrounds
-- ⚪ **White** - Text & icons
-
-### **Map Background**
-- 🌑 **Fog** `#0a0a0f` - Atmosphere
-- 🌌 **Horizon** `#1a1a2e` - Sky gradient
-- ⚫ **Space** `#000000` - Deep background
-
-The color scheme creates a cyberpunk/vascular aesthetic with cyan for healthy transit flow and orange/red for delays, while restaurants use a standard rating color system (green=best, red=worst).
