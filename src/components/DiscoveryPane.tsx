@@ -93,7 +93,7 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
   // Initial load - search for popular places on startup
   useEffect(() => {
     if (results.length === 0 && !query && searchType === 'restaurants') {
-      search('popular restaurant boston');
+      search('popular restaurant nyc');
     }
   }, [results.length, query, search, searchType]);
 
@@ -121,7 +121,7 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
    */
   const handleEventsClick = useCallback(() => {
     setSearchType('events');
-    search('upcoming events boston');
+    search('upcoming events nyc');
   }, [setSearchType, search]);
 
   /**
@@ -129,7 +129,7 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
    */
   const handleLandmarksClick = useCallback(() => {
     setSearchType('landmarks');
-    search('famous landmarks attractions boston');
+    search('famous landmarks attractions nyc');
   }, [setSearchType, search]);
 
   /**
@@ -137,7 +137,7 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
    */
   const handleHiddenClick = useCallback(() => {
     setSearchType('hidden');
-    search('hidden gem local secret boston');
+    search('hidden gem local secret nyc');
   }, [setSearchType, search]);
 
   /**
@@ -145,7 +145,7 @@ const DiscoveryPane = forwardRef<DiscoveryPaneRef, DiscoveryPaneProps>(({
    */
   const handleAllClick = useCallback(() => {
     setSearchType('all');
-    search('popular boston');
+    search('popular nyc');
   }, [setSearchType, search]);
 
   /**

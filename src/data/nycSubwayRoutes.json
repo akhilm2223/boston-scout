@@ -1,0 +1,651 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "1",
+        "color": "#EE352E",
+        "name": "Line 1"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.9,
+            40.89
+          ],
+          [
+            -73.96,
+            40.8
+          ],
+          [
+            -73.99,
+            40.72
+          ],
+          [
+            -74.014,
+            40.702
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "2",
+        "color": "#EE352E",
+        "name": "Line 2"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.85,
+            40.89
+          ],
+          [
+            -73.96,
+            40.8
+          ],
+          [
+            -73.99,
+            40.72
+          ],
+          [
+            -73.95,
+            40.65
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "3",
+        "color": "#EE352E",
+        "name": "Line 3"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.94,
+            40.82
+          ],
+          [
+            -73.96,
+            40.8
+          ],
+          [
+            -73.99,
+            40.72
+          ],
+          [
+            -73.89,
+            40.66
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "4",
+        "color": "#00933C",
+        "name": "Line 4"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.89,
+            40.88
+          ],
+          [
+            -73.96,
+            40.8
+          ],
+          [
+            -73.98,
+            40.75
+          ],
+          [
+            -73.96,
+            40.66
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "5",
+        "color": "#00933C",
+        "name": "Line 5"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.83,
+            40.89
+          ],
+          [
+            -73.96,
+            40.8
+          ],
+          [
+            -73.98,
+            40.75
+          ],
+          [
+            -73.94,
+            40.64
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "6",
+        "color": "#00933C",
+        "name": "Line 6"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.83,
+            40.85
+          ],
+          [
+            -73.96,
+            40.8
+          ],
+          [
+            -73.98,
+            40.75
+          ],
+          [
+            -74.004,
+            40.713
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "7",
+        "color": "#B933AD",
+        "name": "Line 7"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.83,
+            40.76
+          ],
+          [
+            -73.94,
+            40.74
+          ],
+          [
+            -73.995,
+            40.755
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "A",
+        "color": "#0039A6",
+        "name": "Line A"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.9255,
+            40.8688
+          ],
+          [
+            -74.0024,
+            40.7648
+          ],
+          [
+            -74.009,
+            40.713
+          ],
+          [
+            -73.902,
+            40.678
+          ],
+          [
+            -73.7915,
+            40.66
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "C",
+        "color": "#0039A6",
+        "name": "Line C"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.94,
+            40.84
+          ],
+          [
+            -74.0024,
+            40.7648
+          ],
+          [
+            -74.009,
+            40.713
+          ],
+          [
+            -73.875,
+            40.675
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "E",
+        "color": "#0039A6",
+        "name": "Line E"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.79,
+            40.7
+          ],
+          [
+            -73.94,
+            40.745
+          ],
+          [
+            -73.99,
+            40.76
+          ],
+          [
+            -74.011,
+            40.711
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "B",
+        "color": "#FF6319",
+        "name": "Line B"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.896,
+            40.86
+          ],
+          [
+            -73.96,
+            40.8
+          ],
+          [
+            -73.98,
+            40.758
+          ],
+          [
+            -73.995,
+            40.72
+          ],
+          [
+            -73.95,
+            40.65
+          ],
+          [
+            -73.96,
+            40.576
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "D",
+        "color": "#FF6319",
+        "name": "Line D"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.88,
+            40.87
+          ],
+          [
+            -73.96,
+            40.8
+          ],
+          [
+            -73.98,
+            40.758
+          ],
+          [
+            -73.995,
+            40.72
+          ],
+          [
+            -74,
+            40.64
+          ],
+          [
+            -73.98,
+            40.577
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "F",
+        "color": "#FF6319",
+        "name": "Line F"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.8,
+            40.71
+          ],
+          [
+            -73.94,
+            40.75
+          ],
+          [
+            -73.98,
+            40.758
+          ],
+          [
+            -73.995,
+            40.72
+          ],
+          [
+            -73.98,
+            40.66
+          ],
+          [
+            -73.978,
+            40.577
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "M",
+        "color": "#FF6319",
+        "name": "Line M"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.89,
+            40.71
+          ],
+          [
+            -73.94,
+            40.75
+          ],
+          [
+            -73.98,
+            40.758
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "G",
+        "color": "#6CBE45",
+        "name": "Line G"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.95,
+            40.74
+          ],
+          [
+            -73.955,
+            40.71
+          ],
+          [
+            -73.98,
+            40.68
+          ],
+          [
+            -73.98,
+            40.66
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "J",
+        "color": "#996633",
+        "name": "Line J"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.805,
+            40.7
+          ],
+          [
+            -73.945,
+            40.695
+          ],
+          [
+            -74.004,
+            40.708
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "Z",
+        "color": "#996633",
+        "name": "Line Z"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.805,
+            40.7
+          ],
+          [
+            -73.945,
+            40.695
+          ],
+          [
+            -74.004,
+            40.708
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "L",
+        "color": "#A7A9AC",
+        "name": "Line L"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -74.005,
+            40.74
+          ],
+          [
+            -73.98,
+            40.73
+          ],
+          [
+            -73.9,
+            40.67
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "N",
+        "color": "#FCCC0A",
+        "name": "Line N"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.91,
+            40.77
+          ],
+          [
+            -73.983,
+            40.76
+          ],
+          [
+            -73.99,
+            40.74
+          ],
+          [
+            -74.01,
+            40.64
+          ],
+          [
+            -73.98,
+            40.577
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "Q",
+        "color": "#FCCC0A",
+        "name": "Line Q"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.95,
+            40.77
+          ],
+          [
+            -73.983,
+            40.76
+          ],
+          [
+            -73.99,
+            40.74
+          ],
+          [
+            -73.97,
+            40.66
+          ],
+          [
+            -73.96,
+            40.576
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "R",
+        "color": "#FCCC0A",
+        "name": "Line R"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.89,
+            40.74
+          ],
+          [
+            -73.983,
+            40.76
+          ],
+          [
+            -73.99,
+            40.74
+          ],
+          [
+            -74.02,
+            40.63
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "route_id": "S",
+        "color": "#808183",
+        "name": "Line S"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -73.978,
+            40.7527
+          ],
+          [
+            -73.9867,
+            40.7559
+          ]
+        ]
+      }
+    }
+  ]
+}

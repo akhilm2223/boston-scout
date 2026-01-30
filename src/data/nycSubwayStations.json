@@ -1,0 +1,140 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "stop_id": "127",
+        "stop_name": "Times Sq-42 St",
+        "routes": "1237NQRS"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.9867,
+          40.7559
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stop_id": "631",
+        "stop_name": "Grand Central-42 St",
+        "routes": "4567S"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.9772,
+          40.7527
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stop_id": "A32",
+        "stop_name": "W 4 St-Wash Sq",
+        "routes": "ABCDEFM"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.0004,
+          40.7308
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stop_id": "R23",
+        "stop_name": "Herald Sq-34 St",
+        "routes": "BDFMNQRW"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.988,
+          40.7496
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stop_id": "L06",
+        "stop_name": "1 Av",
+        "routes": "L"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.9816,
+          40.7305
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stop_id": "120",
+        "stop_name": "96 St",
+        "routes": "123"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.9723,
+          40.7961
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stop_id": "R16",
+        "stop_name": "Queensboro Plaza",
+        "routes": "7NQW"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.9402,
+          40.7504
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stop_id": "G22",
+        "stop_name": "Court Sq",
+        "routes": "EGM"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.9442,
+          40.7466
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "stop_id": "235",
+        "stop_name": "Atlantic Av-Barclays Ctr",
+        "routes": "2345BDNQR"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.9778,
+          40.684
+        ]
+      }
+    }
+  ]
+}

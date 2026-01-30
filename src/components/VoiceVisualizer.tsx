@@ -7,7 +7,7 @@ interface VoiceVisualizerProps {
 
 const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({ audioLevel, isActive }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const animationFrameRef = useRef<number | undefined>();
+    const animationFrameRef = useRef<number | undefined>(undefined);
 
     useEffect(() => {
         const canvas = canvasRef.current;

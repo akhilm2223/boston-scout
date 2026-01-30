@@ -1,7 +1,7 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { BostonEvent, formatEventDate, formatEventTime } from '../services/eventsApi';
-import { ItineraryEvent } from './EventSearchPanel';
+import { ItineraryEvent } from '../types';
 import { searchPlaces } from '../services/googlePlacesApi';
 import './PlacesPanel.css';
 
@@ -167,7 +167,7 @@ export default function PlacesPanel({ onAddToItinerary, onLocationClick }: Place
         onAddToItinerary({
             id: `restaurant - ${restaurant._id} `,
             name: restaurant.businessname,
-            location: [restaurant.longitude, restaurant.latitude],
+            location: { lat: restaurant.latitude, lng: restaurant.longitude },
             time: 'Flexible',
             duration: '~1 hour',
             vibe: catStr,
@@ -181,7 +181,7 @@ export default function PlacesPanel({ onAddToItinerary, onLocationClick }: Place
         onAddToItinerary({
             id: event._id,
             name: event.title,
-            location: [event.venue.lng, event.venue.lat],
+            location: { lat: event.venue.lat, lng: event.venue.lng },
             time: formatEventTime(event.start_time),
             duration: 'Event',
             vibe: event.venue.name,

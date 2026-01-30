@@ -99,19 +99,19 @@ export function useVoiceOnboarding(callbacks: VoiceOnboardingCallbacks) {
         const lowerInput = answer.toLowerCase();
         const interests: string[] = [];
 
-        if (lowerInput.includes('event') || lowerInput.includes('concert') || lowerInput.includes('show') || 
+        if (lowerInput.includes('event') || lowerInput.includes('concert') || lowerInput.includes('show') ||
             lowerInput.includes('activit') || lowerInput.includes('things to do') || lowerInput.includes('what\'s happening')) {
             interests.push('events');
         }
-        if (lowerInput.includes('restaurant') || lowerInput.includes('food') || lowerInput.includes('eat') || 
+        if (lowerInput.includes('restaurant') || lowerInput.includes('food') || lowerInput.includes('eat') ||
             lowerInput.includes('dining') || lowerInput.includes('hungry') || lowerInput.includes('drink')) {
             interests.push('restaurants');
         }
-        if (lowerInput.includes('tourist') || lowerInput.includes('sight') || lowerInput.includes('landmark') || 
+        if (lowerInput.includes('tourist') || lowerInput.includes('sight') || lowerInput.includes('landmark') ||
             lowerInput.includes('monument') || lowerInput.includes('attraction') || lowerInput.includes('museum')) {
             interests.push('landmarks');
         }
-        if (lowerInput.includes('hidden') || lowerInput.includes('secret') || lowerInput.includes('local') || 
+        if (lowerInput.includes('hidden') || lowerInput.includes('secret') || lowerInput.includes('local') ||
             lowerInput.includes('off the beaten') || lowerInput.includes('unknown')) {
             interests.push('hidden');
         }
@@ -126,7 +126,7 @@ export function useVoiceOnboarding(callbacks: VoiceOnboardingCallbacks) {
     const questions: OnboardingQuestion[] = [
         {
             id: 'start-date',
-            text: "When are you arriving in Boston?",
+            text: "When are you arriving in New York City?",
             parser: (answer: string) => parseNaturalDate(answer),
             onAnswer: (date: Date | null) => {
                 if (date) {
@@ -186,7 +186,7 @@ export function useVoiceOnboarding(callbacks: VoiceOnboardingCallbacks) {
         try {
             switch (command.type) {
                 case 'exit':
-                    await voiceService.speak("Goodbye! Have a great time in Boston!");
+                    await voiceService.speak("Goodbye! Have a great time in New York!");
                     setTimeout(() => {
                         setIsActive(false);
                         callbacks.onComplete();
@@ -328,7 +328,7 @@ export function useVoiceOnboarding(callbacks: VoiceOnboardingCallbacks) {
             } else {
                 // Onboarding complete - switch to conversation mode
                 console.log('[Voice] 🎉 Onboarding complete! Switching to conversation mode');
-                await voiceService.speak("Perfect! I'm ready to help. Ask me anything about Boston, or say commands like 'show events' or 'scroll down'.");
+                await voiceService.speak("Perfect! I'm ready to help. Ask me anything about NYC, or say commands like 'show events' or 'scroll down'.");
                 setTimeout(() => {
                     setMode('conversation');
                     voiceService.startListening();

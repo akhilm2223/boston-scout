@@ -11,14 +11,14 @@ export interface ItineraryEvent {
 }
 
 export interface SearchResult {
-    classification: {
-        categories: string[];
-        dateHint: string | null;
-        keywords: string[];
-    };
-    dateRange: { start: string; end: string } | null;
-    count: number;
-    events: BostonEvent[];
+	classification: {
+		categories: string[];
+		dateHint: string | null;
+		keywords: string[];
+	};
+	dateRange: { start: string; end: string } | null;
+	count: number;
+	events: BostonEvent[];
 }
 
 export interface Place {
@@ -48,37 +48,30 @@ export interface Place {
 	good_for_groups?: boolean;
 }
 
+// Restaurant is the same as Place
+export type Restaurant = Place;
+
 
 export interface PlacesPanelProps {
 	onAddToItinerary: (event: ItineraryEvent) => void;
 	onLocationClick: (location: [number, number], name: string) => void;
 }
 
-export interface SearchResult {
-	classification: {
-		categories: string[];
-		dateHint: string | null;
-		keywords: string[];
-	};
-	dateRange: { start: string; end: string } | null;
-	count: number;
-	events: BostonEvent[];
-}   
-
 export interface BostonEvent {
-  _id: string;
-  id: string;
-  title: string;
-  description: string;
-  start_time: string;
-  end_time: string;
-  venue: {
-    name: string;
-    lat: number;
-    lng: number;
-  };
-  categories?: string[];
-  price?: string;
-  source?: string;
-  source_url?: string;
+	_id: string;
+	id: string;
+	title: string;
+	description: string;
+	start_time: string;
+	end_time: string;
+	venue: {
+		name: string;
+		lat: number;
+		lng: number;
+	};
+	categories?: string[];
+	price?: string;
+	source?: string;
+	source_url?: string;
+	image_url?: string;
 }

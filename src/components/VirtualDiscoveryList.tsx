@@ -41,14 +41,14 @@ interface RowComponentProps extends RowProps {
 /**
  * Event card component for rendering events - matches VibePlaceCard style
  */
-function EventCard({ 
-  event, 
-  isAdded, 
-  onAdd, 
-  onSkip, 
-  onClick, 
-  style 
-}: { 
+function EventCard({
+  event,
+  isAdded,
+  onAdd,
+  onSkip,
+  onClick,
+  style
+}: {
   event: EventSearchResult;
   isAdded: boolean;
   onAdd: () => void;
@@ -62,9 +62,9 @@ function EventCard({
   const formatDate = (dateStr: string) => {
     try {
       const date = new Date(dateStr);
-      return date.toLocaleDateString('en-US', { 
-        weekday: 'short', 
-        month: 'short', 
+      return date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
         day: 'numeric',
         hour: 'numeric',
         minute: '2-digit'
@@ -77,11 +77,11 @@ function EventCard({
   // Generate image URL - use event image or fallback to category-based Unsplash
   const getImageUrl = () => {
     if (event.image_url) return event.image_url;
-    
+
     // Category-based fallback images
     const category = (event.category || '').toLowerCase();
     let searchTerm = 'concert,event,boston';
-    
+
     if (category.includes('music') || category.includes('concert')) {
       searchTerm = 'concert,live-music,performance';
     } else if (category.includes('sport')) {
@@ -95,15 +95,15 @@ function EventCard({
     } else if (category.includes('theater') || category.includes('theatre')) {
       searchTerm = 'theater,stage,performance';
     }
-    
+
     return `https://source.unsplash.com/400x300/?${searchTerm}`;
   };
 
   const imageUrl = getImageUrl();
 
   return (
-    <div 
-      className={`vibe-place-card event-card ${isAdded ? 'added' : ''}`} 
+    <div
+      className={`vibe-place-card event-card ${isAdded ? 'added' : ''}`}
       style={{
         ...style,
         '--card-image': `url(${imageUrl})`
@@ -165,14 +165,14 @@ function EventCard({
 /**
  * Reddit card component for rendering Reddit posts
  */
-function RedditCard({ 
-  post, 
-  isAdded, 
-  onAdd, 
-  onSkip, 
-  onClick, 
-  style 
-}: { 
+function RedditCard({
+  post,
+  isAdded,
+  onAdd,
+  onSkip,
+  onClick,
+  style
+}: {
   post: RedditSearchResult;
   isAdded: boolean;
   onAdd: () => void;
@@ -186,7 +186,7 @@ function RedditCard({
   const getImageUrl = () => {
     const categories = post.categories || [];
     let searchTerm = 'boston,city,hidden';
-    
+
     if (categories.some(c => c.toLowerCase().includes('food'))) {
       searchTerm = 'restaurant,food,hidden-gem';
     } else if (categories.some(c => c.toLowerCase().includes('bar') || c.toLowerCase().includes('nightlife'))) {
@@ -196,15 +196,15 @@ function RedditCard({
     } else if (categories.some(c => c.toLowerCase().includes('outdoor') || c.toLowerCase().includes('park'))) {
       searchTerm = 'park,nature,outdoor,boston';
     }
-    
+
     return `https://source.unsplash.com/400x300/?${searchTerm}`;
   };
 
   const imageUrl = getImageUrl();
 
   return (
-    <div 
-      className={`vibe-place-card reddit-card ${isAdded ? 'added' : ''}`} 
+    <div
+      className={`vibe-place-card reddit-card ${isAdded ? 'added' : ''}`}
       style={{
         ...style,
         '--card-image': `url(${imageUrl})`
@@ -420,7 +420,7 @@ export default function VirtualDiscoveryList({
         rowCount={itemCount}
         rowHeight={ITEM_HEIGHT}
         rowProps={rowProps}
-        rowComponent={Row}
+        rowComponent={Row as any}
         overscanCount={OVERSCAN_COUNT}
         onRowsRendered={handleRowsRendered}
         className="virtual-list-inner"

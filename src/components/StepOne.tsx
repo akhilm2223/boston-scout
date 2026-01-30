@@ -34,15 +34,15 @@ export default function StepOne({ data, onChange }: StepOneProps) {
     const formatDateDisplay = () => {
         if (!startDate) return 'Select dates';
         if (!endDate || startDate === endDate) {
-            return parseLocalDate(startDate).toLocaleDateString('en-US', { 
-                weekday: 'short', month: 'short', day: 'numeric' 
+            return parseLocalDate(startDate).toLocaleDateString('en-US', {
+                weekday: 'short', month: 'short', day: 'numeric'
             });
         }
-        const start = parseLocalDate(startDate).toLocaleDateString('en-US', { 
-            month: 'short', day: 'numeric' 
+        const start = parseLocalDate(startDate).toLocaleDateString('en-US', {
+            month: 'short', day: 'numeric'
         });
-        const end = parseLocalDate(endDate).toLocaleDateString('en-US', { 
-            month: 'short', day: 'numeric' 
+        const end = parseLocalDate(endDate).toLocaleDateString('en-US', {
+            month: 'short', day: 'numeric'
         });
         return `${start} - ${end}`;
     };
@@ -60,7 +60,7 @@ export default function StepOne({ data, onChange }: StepOneProps) {
     return (
         <div className="w-full p-6 space-y-6">
             <div className="text-center mb-8">
-                <h2 className="text-2xl font-bold text-(--text-primary) transition-colors duration-300">When are you visiting Boston?</h2>
+                <h2 className="text-2xl font-bold text-(--text-primary) transition-colors duration-300">When are you visiting New York City?</h2>
                 <p className="text-(--text-secondary) mt-2 transition-colors duration-300">Select your travel dates to help us plan your itinerary</p>
             </div>
 
@@ -120,7 +120,7 @@ export default function StepOne({ data, onChange }: StepOneProps) {
                     <span className="text-(--text-primary) transition-colors duration-300">Specify arrival and departure times</span>
                 </label>
                 <p className="text-(--text-muted) text-sm mt-1 ml-8 transition-colors duration-300">
-                    {specifyTimes 
+                    {specifyTimes
                         ? "Set specific times for your arrival and departure"
                         : "We'll assume full days (midnight to midnight)"
                     }
@@ -168,7 +168,7 @@ export default function StepOne({ data, onChange }: StepOneProps) {
                                 const today = new Date();
                                 let start = new Date();
                                 let end = new Date();
-                                
+
                                 switch (option) {
                                     case 'Today':
                                         // start and end are today
@@ -189,7 +189,7 @@ export default function StepOne({ data, onChange }: StepOneProps) {
                                         end.setDate(today.getDate() + daysUntilMonday + 6);
                                         break;
                                 }
-                                
+
                                 // Format as YYYY-MM-DD in local timezone (not UTC)
                                 const formatDate = (d: Date) => {
                                     const year = d.getFullYear();
@@ -197,7 +197,7 @@ export default function StepOne({ data, onChange }: StepOneProps) {
                                     const day = String(d.getDate()).padStart(2, '0');
                                     return `${year}-${month}-${day}`;
                                 };
-                                
+
                                 setStartDate(formatDate(start));
                                 setEndDate(formatDate(end));
                             }}

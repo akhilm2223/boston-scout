@@ -52,11 +52,12 @@ export default function RestaurantSearchPanel({ onAddToItinerary, onLocationClic
         // Text search
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase();
-            filtered = filtered.filter(r =>
-                r.businessname?.toLowerCase().includes(query) ||
-                r.categories?.toLowerCase().includes(query) ||
-                r.address?.toLowerCase().includes(query)
-            );
+            filtered = filtered.filter(r => {
+                const categoriesStr = Array.isArray(r.categories) ? r.categories.join(' ') : (r.categories || '');
+                return r.businessname?.toLowerCase().includes(query) ||
+                    categoriesStr.toLowerCase().includes(query) ||
+                    r.address?.toLowerCase().includes(query);
+            });
         }
 
         // Rating filter
@@ -80,7 +81,7 @@ export default function RestaurantSearchPanel({ onAddToItinerary, onLocationClic
         const itineraryEvent: ItineraryEvent = {
             id: `restaurant-${restaurant._id}`,
             name: restaurant.businessname || 'Unknown Restaurant',
-            location: [Number(restaurant.longitude), Number(restaurant.latitude)],
+            location: { lat: Number(restaurant.latitude), lng: Number(restaurant.longitude) },
             time: 'Flexible',
             duration: '~1 hour',
             vibe: categoriesStr,

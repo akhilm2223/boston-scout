@@ -1,17 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import type { CitySettings } from '../App';
-import {
-  fetchVehicles, fetchRoutes, fetchStops, fetchAlerts,
-  vehiclesToGeoJSON, stopsToGeoJSON,
-  type MBTARoute, type MBTAAlert
-} from '../services/mbtaApi';
-import { fetchPlaces, placesToGeoJSON, fetchLandmarks, landmarksToGeoJSON } from '../services/restaurantApi';
-import { fetchEvents, eventsToGeoJSON, formatEventDate, formatEventTime } from '../services/eventsApi';
-import { generatePlaceInsightHTML } from '../services/geminiApi';
-import { MBTA_ARC_TRACKS } from '../data/mbtaArcTracks';
-import { TRAINS_ARC_TRACKS } from '../data/trainsArcTracks';
+import { CitySettings } from '../App';
+// NYC Data
+import nycRoutes from '../data/nycSubwayRoutes.json';
+import nycStations from '../data/nycSubwayStations.json';
+import { fetchLandmarks, landmarksToGeoJSON } from '../services/landmarksApi';
+import { fetchAllMTAFeeds, MTAEntity } from '../services/mtaApi';
 import './Map3D.css';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
@@ -30,8 +25,8 @@ interface Map3DProps {
   itineraryRouteData?: any;
 }
 
-// Boston downtown center
-const BOSTON_CENTER: [number, number] = [-71.0589, 42.3601];
+// New York City center (Times Square)
+const NYC_CENTER: [number, number] = [-73.9855, 40.7580];
 
 
 // Vascular Digital Twin color palette - MLK Weekend Edition
@@ -112,6 +107,35 @@ function lerpColor(c1: string, c2: string, t: number): string {
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 }
 
+// Helper function to format event date
+function formatEventDate(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  } catch {
+    return dateString;
+  }
+}
+
+// Helper function to format event time
+function formatEventTime(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  } catch {
+    return dateString;
+  }
+}
+
+// Generate HTML for place insights
+function generatePlaceInsightHTML(place: any): string {
+  return `<div class="place-popup">
+    <h3>${place.name || 'Unknown Place'}</h3>
+    <p>${place.address || ''}</p>
+    ${place.rating ? `<div>⭐ ${place.rating}</div>` : ''}
+  </div>`;
+}
+
 export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDarkMode, mapCommand, itineraryRouteData }: Map3DProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -127,8 +151,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
 
 
   const [isLoaded, setIsLoaded] = useState(false);
-  const [mbtaRoutes, setMbtaRoutes] = useState<Map<string, MBTARoute>>(new Map());
-  const [alerts, setAlerts] = useState<MBTAAlert[]>([]);
+  // MBTA state removed
 
   const [systemStress, setSystemStress] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -220,11 +243,11 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
     const mapInstance = new mapboxgl.Map({
       container: mapContainer.current,
       style: isDarkMode ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/light-v11',
-      center: [-71.0589, 42.3601], // Boston downtown
-      zoom: 14, // Better zoom to see places/events (was 15)
-      pitch: 60, // Reduced for better visibility (was 65)
+      center: [-73.9855, 40.7580], // New York City (Times Square)
+      zoom: 14,
+      pitch: 60,
       bearing: -15,
-      maxBounds: [[-71.95, 42.15], [-70.85, 42.50]],
+      maxBounds: [[-74.3, 40.4], [-73.7, 40.95]], // NYC bounds
       antialias: true,
       maxPitch: 85,
     });
@@ -270,378 +293,186 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       // ===========================================
 
       // Set initial view to show downtown Boston with visible markers
+      // Set initial view to NYC (Times Square)
       setTimeout(() => {
         mapInstance.easeTo({
-          center: [-71.0589, 42.3601], // Boston downtown
-          zoom: 14, // Good zoom to see places/events/transit
+          center: NYC_CENTER,
+          zoom: 14,
           pitch: 60,
           bearing: -15,
           duration: 1500
         });
-        console.log('[Map] Initial view set - zoom in to see places and events');
+        console.log('[Map] Initial view set to NYC');
       }, 500);
 
       // ===========================================
-      // MBTA VASCULAR TRACKS ("River of Light")
+      // NYC SUBWAY ROUTES ("Vascular Transit")
       // ===========================================
 
-      mapInstance.addSource('mbta-tracks', {
+      // Add NYC subway routes source
+      mapInstance.addSource('nyc-routes', {
         type: 'geojson',
-        data: MBTA_ARC_TRACKS,
-        lineMetrics: true,
+        data: nycRoutes as GeoJSON.FeatureCollection
       });
 
-      console.log('[MBTA] ARC tracks loaded:', MBTA_ARC_TRACKS.features.length, 'arcs');
-
-      // GLOW ZONE - Underneath buildings
-      // Style: "Sharp Vector" (Reference Image Match)
-      // Map MBTA LINE values to official colors
+      // Main route lines with actual MTA colors
       mapInstance.addLayer({
-        id: 'glow-zone',
+        id: 'nyc-routes-line',
         type: 'line',
-        source: 'mbta-tracks',
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: {
-          'line-color': [
-            'match',
-            ['get', 'LINE'],
-            'RED', '#da291c',
-            'BLUE', '#003da5',
-            'ORANGE', '#ff7a00',
-            'GREEN', '#00a651',
-            'SILVER', '#7c8ca3',
-            '#cccccc' // default gray
-          ],
-          // Precise width: 2px -> 5px
-          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2, 14, 3, 16, 5],
-          // Zero blur for sharp "vector" look
-          'line-blur': 0,
-          // Solid opacity
-          'line-opacity': 1.0
-        }
-      });
-
-      // ===========================================
-      // COMMUTER RAIL & AMTRAK TRACKS
-      // ===========================================
-
-      mapInstance.addSource('trains-tracks', {
-        type: 'geojson',
-        data: TRAINS_ARC_TRACKS,
-        lineMetrics: true,
-      });
-
-      console.log('[Trains] ARC tracks loaded:', TRAINS_ARC_TRACKS.features.length, 'arcs');
-
-      // Commuter rail main layer
-      mapInstance.addLayer({
-        id: 'trains-core',
-        type: 'line',
-        source: 'trains-tracks',
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: {
-          'line-color': [
-            'case',
-            ['==', ['get', 'OWNERSHIP'], 'AMTRAK'],
-            VASCULAR_COLORS.amtrakColor,    // Blue for Amtrak
-            VASCULAR_COLORS.commuterRailColor // Brown for commuter rail
-          ],
-          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1, 14, 1.5, 16, 2.5],
-          'line-blur': 0.2,
-          'line-opacity': 0.4
-        }
-      });
-
-      // Try to hide default 3D buildings
-      const defaultBuildingLayers = [
-        'building', 'building-extrusion', 'building-outline',
-        '3d-buildings', 'building-models'
-      ];
-      defaultBuildingLayers.forEach(layerId => {
-        if (mapInstance.getLayer(layerId)) {
-          mapInstance.setLayoutProperty(layerId, 'visibility', 'none');
-        }
-      });
-
-      // Add vector source for buildings
-      if (!mapInstance.getSource('buildings-source')) {
-        mapInstance.addSource('buildings-source', {
-          type: 'vector',
-          url: 'mapbox://mapbox.mapbox-streets-v8'
-        });
-      }
-
-      // Our custom building layer - gray for light mode (default), black for dark mode
-      mapInstance.addLayer({
-        id: 'buildings-3d',
-        source: 'buildings-source',
-        'source-layer': 'building',
-        filter: ['==', 'extrude', 'true'],
-        type: 'fill-extrusion',
-        minzoom: 14, // CULLING: Hide when zoomed out
-        paint: {
-          'fill-extrusion-color': '#cccccc',
-          'fill-extrusion-height': ['coalesce', ['get', 'height'], 15],
-          'fill-extrusion-base': ['coalesce', ['get', 'min_height'], 0],
-          'fill-extrusion-opacity': 0.4,
-          'fill-extrusion-vertical-scale': 1.0,
-          'fill-extrusion-ambient-occlusion-intensity': 0.3,
-        },
-      });
-
-      mapInstance.addSource('mbta-trails', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      });
-
-      // ===========================================
-      // ANIMATED LIGHT TRAILS LAYER
-      // ===========================================
-
-      // Trail glow (motion blur halo)
-      mapInstance.addLayer({
-        id: 'trails-glow',
-        type: 'line',
-        source: 'mbta-trails',
-        paint: {
-          'line-color': ['get', 'glowColor'],
-          'line-width': ['*', ['get', 'width'], 3],
-          'line-blur': ['get', 'blur'],
-          'line-opacity': ['*', ['get', 'intensity'], 0.4],
-        },
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-      });
-
-      // Trail core (bright leading edge)
-      mapInstance.addLayer({
-        id: 'trails-core',
-        type: 'line',
-        source: 'mbta-trails',
+        source: 'nyc-routes',
         paint: {
           'line-color': ['get', 'color'],
-          'line-width': ['get', 'width'],
-          'line-blur': 0.5,
-          'line-opacity': ['get', 'intensity'],
-        },
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
-      });
-
-      // Trail head highlight (brightest point)
-      mapInstance.addLayer({
-        id: 'trails-head',
-        type: 'line',
-        source: 'mbta-trails',
-        filter: ['==', ['get', 'isHead'], true],
-        paint: {
-          'line-color': '#ffffff',
           'line-width': 4,
-          'line-blur': 0,
-          'line-opacity': 0.95,
-        },
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
+          'line-opacity': 0.9
+        }
       });
 
-      // ===========================================
-      // STATION MARKERS (AR-style pins)
-      // ===========================================
-
-      mapInstance.addSource('mbta-stops', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      });
-
-      // Station core marker (MBTA style)
+      // Glow effect for routes
       mapInstance.addLayer({
-        id: 'stops-marker',
-        type: 'circle',
-        source: 'mbta-stops',
+        id: 'nyc-routes-glow',
+        type: 'line',
+        source: 'nyc-routes',
         paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 4, 16, 8],
-          'circle-color': '#ffffff', // MBTA red
-          'circle-stroke-color': "#000000",
-          'circle-stroke-width': 1.5,
-        },
-        minzoom: 12,
+          'line-color': ['get', 'color'],
+          'line-width': 12,
+          'line-opacity': 0.3,
+          'line-blur': 6
+        }
+      }, 'nyc-routes-line');
+
+      // ===========================================
+      // NYC SUBWAY STATIONS
+      // ===========================================
+
+      // Add NYC stations source
+      mapInstance.addSource('nyc-stations', {
+        type: 'geojson',
+        data: nycStations as GeoJSON.FeatureCollection
       });
 
-      // Station "T" text (MBTA logo)
+      // Station circles
       mapInstance.addLayer({
-        id: 'stops-marker-text',
+        id: 'nyc-stations-circle',
+        type: 'circle',
+        source: 'nyc-stations',
+        paint: {
+          'circle-radius': 6,
+          'circle-color': '#ffffff',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#00f3ff'
+        }
+      });
+
+      // Station glow
+      mapInstance.addLayer({
+        id: 'nyc-stations-glow',
+        type: 'circle',
+        source: 'nyc-stations',
+        paint: {
+          'circle-radius': 12,
+          'circle-color': '#00f3ff',
+          'circle-opacity': 0.3,
+          'circle-blur': 1
+        }
+      }, 'nyc-stations-circle');
+
+      // Station labels
+      mapInstance.addLayer({
+        id: 'nyc-stations-label',
         type: 'symbol',
-        source: 'mbta-stops',
+        source: 'nyc-stations',
         layout: {
-          'text-field': 'T',
-          'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
-          'text-size': ['interpolate', ['linear'], ['zoom'], 12, 6, 16, 10],
-          'text-allow-overlap': true,
+          'text-field': ['get', 'stop_name'],
+          'text-size': 11,
+          'text-offset': [0, 1.5],
+          'text-anchor': 'top',
+          'text-optional': true
         },
         paint: {
-          'text-color': '#000000',
+          'text-color': '#ffffff',
+          'text-halo-color': 'rgba(0, 0, 0, 0.8)',
+          'text-halo-width': 1
         },
-        minzoom: 12,
+        minzoom: 13
       });
 
+      console.log('[Map] NYC subway routes and stations added');
+
       // ===========================================
-      // REALISTIC VEHICLE MARKERS
+      // NYC SUBWAY TRAINS (Live Animated)
       // ===========================================
 
-      mapInstance.addSource('mbta-vehicles', {
+      // Add train vehicles source
+      mapInstance.addSource('nyc-trains', {
         type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
+        data: { type: 'FeatureCollection', features: [] }
       });
 
-      // Vehicle glow halo (route color)
-      mapInstance.addLayer({
-        id: 'vehicles-glow',
-        type: 'circle',
-        source: 'mbta-vehicles',
-        // Show for all (Rail + Bus) to maintain consistency
-        filter: ['!=', ['get', 'opacity'], 0],
-        paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'],
-            10, 15,  // Large glow at city scale
-            14, 25,  // Big halo
-            16, 45   // Massive street light effect
-          ],
-          'circle-color': ['get', 'routeColor'],
-          'circle-blur': 1.0, // Max blur for "Glow" effect
-          'circle-opacity': 0.6, // Visible but not overpowering the model
-          'circle-translate': [0, 0],
-        },
-      });
+      // Train 3D Model
+      // Load the model (safely)
+      try {
+        mapInstance.addModel('subway-model', '/models/subway.glb');
+      } catch (e) {
+        // Model might already be loaded or method not supported
+        console.warn('Could not add subway model', e);
+      }
 
-      // ===========================================
-      // 3D MODEL LAYER - High Fidelity Trains
-      // ===========================================
+      // 3D Model Layer
       mapInstance.addLayer({
-        id: 'mbta-subway-3d',
+        id: 'nyc-trains-model',
         type: 'model',
-        source: 'mbta-vehicles',
-        // // Only render 3D model for trains (not buses)
-        // filter: ['all', ['!=', ['get', 'opacity'], 0], ['!=', ['get', 'vehicleType'], 'bus']],
+        source: 'nyc-trains',
         layout: {
           'model-id': 'subway-model'
         },
         paint: {
-          // DYNAMIC SCALING: "Little Big" Style - ENLARGED
-          'model-scale': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            10, ['literal', [160, 160, 160]], // Icon Mode (City View) - Boosted & Enlarged
-            14, ['literal', [50, 50, 50]], // Mid-range - Enlarged
-            16, ['literal', [20, 20, 20]],    // Approaching street - Enlarged
-            18, [
-              'case',
-              ['==', ['get', 'vehicleType'], 'commuter'],
-              ['literal', [7.0, 7.0, 7.0]], // Commuter Rail - Enlarged
-              ['==', ['get', 'vehicleType'], 'lightrail'],
-              ['literal', [10.0, 10.0, 10.0]], // Green Line - Enlarged
-              ['==', ['get', 'vehicleType'], 'bus'],
-              ['literal', [4.5, 4.5, 4.5]], // Bus - Enlarged
-              ['literal', [10.0, 10.0, 10.0]]  // Standard Subway - Enlarged
-            ]
-          ],
-          // REAL RUNNING: Rotate based on API bearing
-          'model-rotation': [0, 0, ['get', 'bearing']],
-
-          // ROUTE COLOR TINT: Apply line color to each subway model
-          // Use routeColor directly - Mapbox should interpret hex colors
-          'model-color': ['get', 'routeColor'],
-          // Control the intensity of the color blend (0 = no tint, 1 = full color)
-          'model-color-mix-intensity': 0.8,
-
-          // REALISM RESTORED:
-          // User wants "Real" train color (textures) + Glow.
-          // Glow is handled by the 'vehicles-glow' halo layer behind this model.
-          // Route color tint makes the model match the line color.
-
-          'model-emissive-strength': 0.0, // No emissive glow - rely on halo layer for brightness
-          'model-opacity': ['get', 'opacity']
+          'model-scale': [150, 150, 150], // Adjust scale based on model size
+          'model-rotation': [0, 0, 90], // Align with track
+          'model-translation': [0, 0, 0],
+          'model-opacity': 1,
+          'model-color-mix-intensity': 1,
+          'model-color': ['get', 'color'] // Dynamic color from properties
         }
       });
 
-
-      // ===== BUS MARKERS (Removed 2D circles, using 3D model now) =====
-      /*
+      // Simple glow effect (keep as circle for performance/visibility)
       mapInstance.addLayer({
-        id: 'bus-body',
+        id: 'nyc-trains-glow',
         type: 'circle',
-        source: 'mbta-vehicles',
-        filter: ['==', ['get', 'isBus'], true],
+        source: 'nyc-trains',
         paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 4, 16, 8],
-          'circle-color': '#ffc72c', // MBTA Bus Yellow
-          'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': 1,
-          'circle-opacity': 0.8,
-        },
+          'circle-radius': 20,
+          'circle-color': ['get', 'color'],
+          'circle-opacity': 0.6,
+          'circle-blur': 1,
+          'circle-pitch-alignment': 'map'
+        }
       });
- 
-      // Bus route label
+
+      // Train route label
       mapInstance.addLayer({
-        id: 'bus-label',
+        id: 'nyc-trains-label',
         type: 'symbol',
-        source: 'mbta-vehicles',
-        filter: ['==', ['get', 'isBus'], true],
+        source: 'nyc-trains',
         layout: {
-          'text-field': ['get', 'label'],
-          'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
-          'text-size': ['interpolate', ['linear'], ['zoom'], 12, 8, 16, 12],
-          'text-allow-overlap': false,
-        },
-        paint: {
-          'text-color': '#ffffff',
-          'text-halo-color': '#000000',
-          'text-halo-width': 1,
-        },
-        minzoom: 14,
-      });
-      */
-
-      // Bus direction arrow
-      // Bus direction arrow removed (replaced by 3D model)
-
-      // Train layers replaced by 3D model
-      // Keeping direction arrow for debug/clarity if needed, but model has orientation
-
-
-      // ===== FERRY MARKERS =====
-      mapInstance.addLayer({
-        id: 'ferry-body',
-        type: 'circle',
-        source: 'mbta-vehicles',
-        filter: ['==', ['get', 'vehicleType'], 'ferry'],
-        paint: {
-          'circle-radius': ['interpolate', ['linear'], ['zoom'], 12, 8, 16, 16],
-          'circle-color': '#4a90d9',
-          'circle-stroke-color': '#ffffff',
-          'circle-stroke-width': 3,
-        },
-      });
-
-      mapInstance.addLayer({
-        id: 'ferry-label',
-        type: 'symbol',
-        source: 'mbta-vehicles',
-        filter: ['==', ['get', 'vehicleType'], 'ferry'],
-        layout: {
-          'text-field': 'F',
+          'text-field': ['get', 'routeId'],
+          'text-size': 10,
           'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
-          'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10, 16, 14],
-          'text-allow-overlap': true,
+          'text-allow-overlap': true
         },
         paint: {
-          'text-color': '#ffffff',
-        },
+          'text-color': '#ffffff'
+        }
       });
+
+      console.log('[Map] NYC train vehicles layer added');
 
       // ===========================================
       // 3D HUMAN MODEL - Live Location Marker
       // ===========================================
 
-      // Boston Common center coordinates (your live location)
-      const humanLocation: [number, number] = [-71.0657, 42.3550];
+      // NYC Times Square as default location
+      const humanLocation: [number, number] = [-73.9857, 40.7484];
 
       mapInstance.addSource('human-location', {
         type: 'geojson',
@@ -1145,7 +976,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         let typeIcon = '📍';
         let typeColor = '#8b5cf6';
         let typeLabel = 'Visit';
-        
+
         if (stopType === 'hotel') {
           typeIcon = '🏨';
           typeColor = '#f59e0b';
@@ -1165,7 +996,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         let placeRating = props.rating || 0;
         let placeAddress = props.address || '';
         let placeCategories = props.categories || '';
-        
+
         // Extract place name from description (remove "Visit ", "Lunch at ", etc.)
         const cleanName = stopName
           .replace(/^(visit|lunch at|dinner at|breakfast at|arrive at|leave|return to|walk to|exploring|enjoying|checking in at|checking out from|leaving|starting the day from|visiting)\s+/i, '')
@@ -1187,7 +1018,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
               const placeName = (f.properties?.name || '').toLowerCase();
               const searchName = cleanName.toLowerCase();
               return placeName.includes(searchName) || searchName.includes(placeName) ||
-                     placeName.split(' ').some((word: string) => searchName.includes(word) && word.length > 3);
+                placeName.split(' ').some((word: string) => searchName.includes(word) && word.length > 3);
             });
 
             if (matchingPlace?.properties) {
@@ -1195,7 +1026,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
               if (!placeRating) placeRating = p.rating || 0;
               if (!placeAddress) placeAddress = p.address || '';
               if (!placeCategories) placeCategories = p.categories || '';
-              
+
               if (p.photoName) {
                 photoUrl = p.photoName.startsWith('http') ? p.photoName :
                   p.photoName.startsWith('places/') ?
@@ -1271,8 +1102,8 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
           </div>
         `;
 
-        new mapboxgl.Popup({ 
-          maxWidth: '340px', 
+        new mapboxgl.Popup({
+          maxWidth: '340px',
           className: 'itinerary-popup-container',
           closeButton: true,
           closeOnClick: true
@@ -1443,13 +1274,12 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
           </div>`
           : '';
 
-        // Generate Gemini insight
-        const insightHTML = await generatePlaceInsightHTML(
-          props.name,
-          props.categories || '',
-          rating,
-          props.city
-        );
+        // Generate place insight
+        const insightHTML = generatePlaceInsightHTML({
+          name: props.name,
+          address: props.address,
+          rating: rating
+        });
 
         const popupHTML = `
           <div class="place-popup">
@@ -1792,47 +1622,11 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       console.log('[Map] Loading initial data inside on(load)...');
 
       try {
-        const [routesData, alertsData, stopsData, placesData, eventsData, landmarksData] = await Promise.all([
-          fetchRoutes(),
-          fetchAlerts(),
-          fetchStops(),
-          fetchPlaces(),
-          fetchEvents(),
+        const [landmarksData] = await Promise.all([
           fetchLandmarks(),
         ]);
 
-        console.log('[MBTA] Data loaded - routes:', routesData.length, 'stops:', stopsData.length, 'alerts:', alertsData.length);
-        console.log('[Places] Loaded:', placesData.length, 'places');
-        console.log('[Events] Loaded:', eventsData.length, 'events');
         console.log('[Landmarks] Loaded:', landmarksData.length, 'landmarks');
-
-        // Set stops data
-        if (mapInstance.getSource('mbta-stops')) {
-          (mapInstance.getSource('mbta-stops') as mapboxgl.GeoJSONSource).setData(stopsToGeoJSON(stopsData));
-          console.log('[MBTA] Stops set on map');
-        } else {
-          console.warn('[MBTA] Stops source not found!');
-        }
-
-        // Set places data
-        if (mapInstance.getSource('places')) {
-          const placeGeoJSON = placesToGeoJSON(placesData);
-          console.log('[Places] Setting GeoJSON with', placeGeoJSON.features.length, 'features');
-          (mapInstance.getSource('places') as mapboxgl.GeoJSONSource).setData(placeGeoJSON);
-          console.log('[Places] ✓ Data set on map!');
-        } else {
-          console.warn('[Places] Source not found!');
-        }
-
-        // Set events data
-        if (mapInstance.getSource('events')) {
-          const eventsGeoJSON = eventsToGeoJSON(eventsData);
-          console.log('[Events] Setting GeoJSON with', eventsGeoJSON.features.length, 'features');
-          (mapInstance.getSource('events') as mapboxgl.GeoJSONSource).setData(eventsGeoJSON);
-          console.log('[Events] ✓ Data set on map!');
-        } else {
-          console.warn('[Events] Source not found!');
-        }
 
         // Set landmarks data
         if (mapInstance.getSource('landmarks')) {
@@ -1843,11 +1637,6 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         } else {
           console.warn('[Landmarks] Source not found!');
         }
-
-        // Store route data for vehicle updates
-        const routeMap = new Map(routesData.map(r => [r.id, r]));
-        setMbtaRoutes(routeMap);
-        setAlerts(alertsData);
 
         console.log('[Map] ✓ All initial data loaded successfully!');
       } catch (error) {
@@ -1864,162 +1653,153 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
     };
   }, []);
 
-  // Real-time vehicle updates (tracks are STATIC, only vehicles are dynamic)
+  // ===========================================
+  // LERP-BASED TRAIN TRACKING (Real MTA Data)
+  // ===========================================
+
+  // MTA route colors for visualization
+  const MTA_ROUTE_COLORS: Record<string, string> = {
+    '1': '#EE352E', '2': '#EE352E', '3': '#EE352E',
+    '4': '#00933C', '5': '#00933C', '6': '#00933C',
+    '7': '#B933AD',
+    'A': '#0039A6', 'C': '#0039A6', 'E': '#0039A6',
+    'B': '#FF6319', 'D': '#FF6319', 'F': '#FF6319', 'M': '#FF6319',
+    'G': '#6CBE45',
+    'J': '#996633', 'Z': '#996633',
+    'L': '#A7A9AC',
+    'N': '#FCCC0A', 'Q': '#FCCC0A', 'R': '#FCCC0A', 'W': '#FCCC0A',
+    'S': '#808183'
+  };
+
+  // Types for train tracking
+  interface MTATrain {
+    id: string;
+    routeId: string;
+    currentStopId: string;
+    currentStop: { lat: number; lng: number; name: string } | null;
+    nextStopId: string | null;
+    nextStop: { lat: number; lng: number; name: string } | null;
+    status: 'STOPPED_AT' | 'IN_TRANSIT_TO';
+    progress: number;
+    departureTime: number;
+    arrivalTime: number;
+    timestamp: number;
+  }
+
+  // Ref to store train state from API
+  const trainDataRef = useRef<{
+    trains: MTATrain[];
+    lastFetch: number;
+  }>({ trains: [], lastFetch: 0 });
+
+  // Fetch train data from API (every 30 seconds)
+  const fetchTrainData = useCallback(async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/mta/trains`);
+      if (!response.ok) throw new Error('Failed to fetch trains');
+      const data = await response.json();
+
+      trainDataRef.current.trains = data.trains || [];
+      trainDataRef.current.lastFetch = Date.now();
+
+      console.log(`[MTA] Fetched ${data.count} trains with coordinates`);
+    } catch (error) {
+      console.error('[MTA] Error fetching train data:', error);
+    }
+  }, []);
+
+  // Poll for train data every 30 seconds
   useEffect(() => {
-    if (!map.current || !isLoaded || mbtaRoutes.size === 0) return;
+    if (!isLoaded) return;
 
-    const updateData = async () => {
-      // Fetch ALL vehicle types (0-4) to show complete transit picture
-      // 0=Light Rail, 1=Heavy Rail, 2=Commuter Rail, 3=Bus, 4=Ferry
-      const vehiclesData = await fetchVehicles([0, 1, 2, 3, 4]);
+    // Initial fetch
+    fetchTrainData();
 
-      // // MOCK WORCESTER TRAIN (Ghost Injection for Demo)
-      // // If no CR-Worcester train exists, create one near WPI
-      // const hasWorcester = vehiclesData.some(v => v.routeId === 'CR-Worcester');
-      // if (!hasWorcester) {
-      //   console.log('[MBTA] Injecting Mock Worcester Train');
-      //   // Simulate a train moving from Worcester to Boston
-      //   // Use a time-based position to simulate movement along the line
-      //   const mockTime = Date.now() / 10000;
-      //   const mockProgress = (mockTime % 100) / 100; // 0 to 1 loop
-
-      //   // Approximate coordinates (Worcester -> Boston)
-      //   // Start: -71.798547, 42.262046 (Union Station)
-      //   // End: -71.055242, 42.366413 (South Station)
-      //   const mockLat = 42.262046 + (42.366413 - 42.262046) * mockProgress;
-      //   const mockLng = -71.798547 + (-71.055242 - -71.798547) * mockProgress;
-
-      //   vehiclesData.push({
-      //     id: 'mock-worcester-ghost',
-      //     latitude: mockLat,
-      //     longitude: mockLng,
-      //     bearing: 80, // Roughly East
-      //     speed: 45,
-      //     currentStatus: 'IN_TRANSIT_TO',
-      //     label: 'Ghost Train 404',
-      //     routeId: 'CR-Worcester',
-      //     directionId: 1,
-      //     updatedAt: new Date().toISOString(),
-      //     occupancyStatus: 'MANY_SEATS_AVAILABLE',
-      //     carriages: []
-      //   });
-      // }
-
-      // Get valid arc IDs from our MBTA arc tracks
-      const staticRouteIds = new Set(
-        MBTA_ARC_TRACKS.features.map(f => f.properties?.ROUTEID || f.properties?.routeId)
-      );
-
-      // Valid routes from ARC tracks (shapefile data)
-      // Passed to vehiclesToGeoJSON for opacity handling (ghost points)
-
-      console.log('[MBTA] Vehicles - total:', vehiclesData.length);
-      // Create GeoJSON, but DON'T set it yet.
-      // Update the LERP state instead.
-      const now = performance.now();
-
-      // Update LERP targets
-      const currentLerpState = vehicleLerpRef.current;
-
-      vehiclesData.forEach(v => {
-        const id = v.id;
-        const exists = currentLerpState.get(id);
-
-        if (exists) {
-          // Update existing: Old target becomes new start
-          // We calculate where it *should* be right now to avoid jumps if we are mid-animation
-          // actually, simplify: Start from current interpolated position? 
-          // For robustness, start from "previous target" (which is where we arrived)
-          // OR, if the API is slow, we might be sitting at "end" for a while.
-
-          currentLerpState.set(id, {
-            startLng: exists.endLng,
-            startLat: exists.endLat,
-            endLng: v.longitude,
-            endLat: v.latitude,
-            startBearing: exists.endBearing,
-            endBearing: v.bearing,
-            startTime: now,
-            duration: 10000 // 10s smoothing
-          });
-        } else {
-          // New vehicle: Start = End (no LERP for first frame)
-          currentLerpState.set(id, {
-            startLng: v.longitude,
-            startLat: v.latitude,
-            endLng: v.longitude,
-            endLat: v.latitude,
-            startBearing: v.bearing,
-            endBearing: v.bearing,
-            startTime: now,
-            duration: 10000
-          });
-        }
-      });
-
-      // Prune old vehicles not in new data
-      const newIds = new Set(vehiclesData.map(v => v.id));
-      for (const [key] of currentLerpState) {
-        if (!newIds.has(key)) {
-          currentLerpState.delete(key);
-        }
-      }
-
-      // Store the raw vehicles data (for properties like label, routeId etc)
-      // We'll merge LERP'd coordinates with these properties in the animation loop
-      // We can reuse the `vehiclesToGeoJSON` function but pass interpolated vehicles
-      (window as any).rawVehicleData = vehiclesData; // Store globally or in ref? Ref is better.
-      (window as any).mbtaRoutes = mbtaRoutes; // Need these for the loop
-      (window as any).staticRouteIds = staticRouteIds;
-
-      // Property Validation: Log warning for ghost vehicles (as requested for cleaning up route_ids)
-      // We can check this on the raw data immediately
-      const ghostCount = vehiclesData.filter(v => !staticRouteIds.has(v.routeId)).length;
-      if (ghostCount > 0) {
-        // Gather IDs
-        const ghosts = vehiclesData.filter(v => !staticRouteIds.has(v.routeId));
-        console.warn(`[MBTA] Found ${ghostCount} ghost vehicles. Routes:`,
-          [...new Set(ghosts.map(v => v.routeId))].join(', ')
-        );
-      }
-
-
-      // Note: Tracks are STATIC - no need to update them every poll
-
-      // Calculate system stress and speed
-      const stressMap: Record<string, number> = {
-        'EMPTY': 0, 'MANY_SEATS_AVAILABLE': 0.1, 'FEW_SEATS_AVAILABLE': 0.3,
-        'STANDING_ROOM_ONLY': 0.6, 'CRUSHED_STANDING_ROOM_ONLY': 0.9, 'FULL': 1.0,
-      };
-
-      let totalStress = 0, totalSpeed = 0, speedCount = 0;
-      const routeSpeedMap = new Map<string, number>();
-
-      vehiclesData.forEach(v => {
-        totalStress += stressMap[v.occupancyStatus || ''] || 0.2;
-        if (v.speed && v.speed > 0) {
-          totalSpeed += v.speed;
-          speedCount++;
-          const current = routeSpeedMap.get(v.routeId) || 0;
-          routeSpeedMap.set(v.routeId, Math.max(current, v.speed));
-        }
-      });
-
-      setSystemStress(vehiclesData.length > 0 ? totalStress / vehiclesData.length : 0.2);
-
-
-      // Populate route delays from alerts (for vascular coral coloring)
-
-
-    };
-
-    updateData();
-    mbtaIntervalRef.current = window.setInterval(updateData, 8000);
+    // Set up polling interval (every 30 seconds as per MTA update frequency)
+    const intervalId = setInterval(fetchTrainData, 30000);
+    mbtaIntervalRef.current = intervalId;
 
     return () => {
-      if (mbtaIntervalRef.current) clearInterval(mbtaIntervalRef.current);
+      if (intervalId) clearInterval(intervalId);
     };
-  }, [isLoaded, mbtaRoutes, alerts]);
+  }, [isLoaded, fetchTrainData]);
+
+  // LERP animation loop - smooth 60fps interpolation between API updates
+  useEffect(() => {
+    if (!map.current || !isLoaded) return;
+
+    let animationId: number;
+
+    const animateTrains = () => {
+      const now = Math.floor(Date.now() / 1000);
+      const trainFeatures: GeoJSON.Feature[] = [];
+
+      trainDataRef.current.trains.forEach(train => {
+        if (!train.currentStop) return;
+
+        let lat: number;
+        let lng: number;
+
+        if (train.status === 'IN_TRANSIT_TO' && train.nextStop) {
+          // Calculate real-time LERP progress
+          const elapsed = now - train.departureTime;
+          const duration = train.arrivalTime - train.departureTime;
+          const lerpProgress = duration > 0
+            ? Math.min(1, Math.max(0, elapsed / duration))
+            : train.progress;
+
+          // Interpolate between current and next stop
+          lat = train.currentStop.lat + (train.nextStop.lat - train.currentStop.lat) * lerpProgress;
+          lng = train.currentStop.lng + (train.nextStop.lng - train.currentStop.lng) * lerpProgress;
+        } else {
+          // Train is stopped at station
+          lat = train.currentStop.lat;
+          lng = train.currentStop.lng;
+        }
+
+        trainFeatures.push({
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [lng, lat]
+          },
+          properties: {
+            id: train.id,
+            routeId: train.routeId,
+            color: MTA_ROUTE_COLORS[train.routeId] || '#00f3ff',
+            status: train.status,
+            stopName: train.currentStop.name || train.currentStopId
+          }
+        });
+      });
+
+      // Update the map source
+      const source = map.current?.getSource('nyc-trains') as mapboxgl.GeoJSONSource;
+      if (source && trainFeatures.length > 0) {
+        source.setData({
+          type: 'FeatureCollection',
+          features: trainFeatures
+        });
+        // Debug log every 5 seconds
+        if (Math.floor(Date.now() / 5000) !== Math.floor((Date.now() - 100) / 5000)) {
+          console.log(`[MTA LERP] Updated ${trainFeatures.length} trains on map`);
+        }
+      } else if (trainDataRef.current.trains.length === 0) {
+        // No data yet - waiting for first fetch
+      } else if (!source) {
+        console.warn('[MTA] nyc-trains source not found on map!');
+      }
+
+      animationId = requestAnimationFrame(animateTrains);
+    };
+
+    // Start animation loop
+    animationId = requestAnimationFrame(animateTrains);
+
+    return () => {
+      if (animationId) cancelAnimationFrame(animationId);
+    };
+  }, [isLoaded]);
 
   // ===========================================
   // MINIMAL ANIMATION - Building Breathing Only
@@ -2028,61 +1808,13 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
     if (!map.current || !isLoaded) return;
 
     const animate = () => {
-
-      // ===========================================
-      // LERP ANIMATION LOOP
-      // ===========================================
-      // ===========================================
-      // LERP ANIMATION LOOP
-      // ===========================================
       // Safety Check: Ensure map and style are fully ready
       if (!map.current || !map.current.getStyle()) {
         animationRef.current = requestAnimationFrame(animate);
         return;
       }
 
-      if ((window as any).rawVehicleData && map.current.getSource('mbta-vehicles')) {
-        const now = performance.now();
-        const rawVehicles = (window as any).rawVehicleData || [];
-        const routes = (window as any).mbtaRoutes;
-        const staticIds = (window as any).staticRouteIds;
-        const lerpState = vehicleLerpRef.current;
-
-        const interpolatedVehicles = rawVehicles.map((v: any) => {
-          const state = lerpState.get(v.id);
-          if (!state) return v;
-
-          // Calculate progress (0 to 1)
-          const t = Math.min((now - state.startTime) / state.duration, 1);
-
-          // Interpolate Position
-          // Simple Linear: P = A + (B - A) * t
-          const lng = state.startLng + (state.endLng - state.startLng) * t;
-          const lat = state.startLat + (state.endLat - state.startLat) * t;
-
-          // Interpolate Bearing (Shortest path)
-          let deltaBearing = state.endBearing - state.startBearing;
-          if (deltaBearing > 180) deltaBearing -= 360;
-          if (deltaBearing < -180) deltaBearing += 360;
-          const bearing = state.startBearing + deltaBearing * t;
-
-          return {
-            ...v,
-            longitude: lng,
-            latitude: lat,
-            bearing: bearing,
-            // Keep speed same or interpolate? Keep same for now
-          };
-        });
-
-        // Convert to GeoJSON
-        // Convert to GeoJSON - show ALL vehicles (no ghost filtering)
-        const geoJson = vehiclesToGeoJSON(interpolatedVehicles, routes, undefined);
-
-        const source = map.current.getSource('mbta-vehicles') as mapboxgl.GeoJSONSource;
-        source.setData(geoJson);
-      }
-
+      // Animation frame for future enhancements
       animationRef.current = requestAnimationFrame(animate);
     };
 
@@ -2108,6 +1840,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       'vehicles-shadow', 'vehicles-glow',
       'bus-body', 'bus-label', 'bus-direction',
       'mbta-subway-3d', 'vehicles-glow', // New 3D layers
+      'nyc-trains-model', 'nyc-trains-glow', // NYC 3D Trains
       'ferry-body', 'ferry-label'
     ];
 
@@ -2244,13 +1977,13 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       if (map.current && isLoaded) {
         // Restore transit (if showTransitLayers was true)
         const transitVis = showTransitLayers ? 'visible' : 'none';
-        ['trails-glow', 'trails-core', 'trails-head', 'stops-glow', 'stops-marker', 
-         'glow-zone', 'trains-core', 'vehicles-glow', 'mbta-subway-3d', 
-         'ferry-body', 'ferry-label'].forEach(layer => {
-          if (map.current?.getLayer(layer)) {
-            map.current.setLayoutProperty(layer, 'visibility', transitVis);
-          }
-        });
+        ['trails-glow', 'trails-core', 'trails-head', 'stops-glow', 'stops-marker',
+          'glow-zone', 'trains-core', 'vehicles-glow', 'mbta-subway-3d',
+          'ferry-body', 'ferry-label'].forEach(layer => {
+            if (map.current?.getLayer(layer)) {
+              map.current.setLayoutProperty(layer, 'visibility', transitVis);
+            }
+          });
 
         // Restore places (if showPlaces was true)
         const placesVis = showPlaces ? 'visible' : 'none';
@@ -2277,13 +2010,13 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         });
 
         // Hide itinerary layers
-        ['itinerary-walking-glow', 'itinerary-walking', 'itinerary-transit-glow', 
-         'itinerary-transit', 'itinerary-stops-circle', 'itinerary-stops-icon', 
-         'itinerary-stops-number-bg', 'itinerary-stops-number', 'itinerary-stops-label'].forEach(layer => {
-          if (map.current?.getLayer(layer)) {
-            map.current.setLayoutProperty(layer, 'visibility', 'none');
-          }
-        });
+        ['itinerary-walking-glow', 'itinerary-walking', 'itinerary-transit-glow',
+          'itinerary-transit', 'itinerary-stops-circle', 'itinerary-stops-icon',
+          'itinerary-stops-number-bg', 'itinerary-stops-number', 'itinerary-stops-label'].forEach(layer => {
+            if (map.current?.getLayer(layer)) {
+              map.current.setLayoutProperty(layer, 'visibility', 'none');
+            }
+          });
 
         console.log('[Itinerary] Cleared - restoring other layers');
       }
@@ -2323,12 +2056,12 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
 
     // Build location lookup from itemLocations and originalItems
     const locationLookup: Map<string, [number, number]> = new Map();
-    
+
     // Add hotel location - check multiple possible formats
     const hotel = itineraryRouteData.hotel;
     if (hotel) {
       let hotelCoords: [number, number] | null = null;
-      
+
       if (hotel.latitude && hotel.longitude) {
         hotelCoords = [hotel.longitude, hotel.latitude];
       } else if (hotel.lat && hotel.lng) {
@@ -2336,7 +2069,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       } else if (hotel.location?.lat && hotel.location?.lng) {
         hotelCoords = [hotel.location.lng, hotel.location.lat];
       }
-      
+
       if (hotelCoords) {
         locationLookup.set('hotel', hotelCoords);
         locationLookup.set('lark', hotelCoords);
@@ -2357,24 +2090,24 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
     if (itineraryRouteData.originalItems) {
       itineraryRouteData.originalItems.forEach((item: any) => {
         let coords: [number, number] | null = null;
-        
+
         if (item.location?.lat && item.location?.lng) {
           coords = [item.location.lng, item.location.lat];
         } else if (item.latitude && item.longitude) {
           coords = [item.longitude, item.latitude];
         }
-        
+
         if (coords) {
           const nameLower = item.name.toLowerCase();
           locationLookup.set(nameLower, coords);
-          
+
           // Add multiple variants for better matching
           // Remove common words and add parts
           const cleanName = nameLower
             .replace(/^(the|a|an)\s+/i, '')
             .replace(/\s+(restaurant|cafe|bar|pub|grill|house|kitchen|tavern|bistro|eatery)$/i, '');
           locationLookup.set(cleanName, coords);
-          
+
           // Add individual significant words
           const words = nameLower.split(/[\s\-,&]+/);
           words.forEach((word: string) => {
@@ -2382,7 +2115,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
               locationLookup.set(word, coords!);
             }
           });
-          
+
           // Add first two words combined
           if (words.length >= 2) {
             locationLookup.set(words.slice(0, 2).join(' '), coords);
@@ -2400,12 +2133,12 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       const details = step.details || '';
       const descLower = description.toLowerCase();
       const detailsLower = details.toLowerCase();
-      
+
       // Check for hotel-related steps
-      if (descLower.includes('hotel') || descLower.includes('check in') || 
-          descLower.includes('check out') || descLower.includes('leave hotel') || 
-          descLower.includes('return to hotel') || descLower.includes('arriving back') ||
-          detailsLower.includes('hotel') || step.type === 'hotel') {
+      if (descLower.includes('hotel') || descLower.includes('check in') ||
+        descLower.includes('check out') || descLower.includes('leave hotel') ||
+        descLower.includes('return to hotel') || descLower.includes('arriving back') ||
+        detailsLower.includes('hotel') || step.type === 'hotel') {
         const hotelCoords = locationLookup.get('hotel');
         if (hotelCoords) {
           console.log('[Itinerary] Matched hotel step:', description);
@@ -2423,13 +2156,13 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         const match = description.match(pattern);
         if (match) {
           const placeName = match[1].toLowerCase().trim();
-          
+
           // Try exact match first
           if (locationLookup.has(placeName)) {
             console.log('[Itinerary] Exact match:', placeName);
             return locationLookup.get(placeName)!;
           }
-          
+
           // Try partial matching
           for (const [name, coords] of locationLookup.entries()) {
             if (placeName.includes(name) || name.includes(placeName)) {
@@ -2437,7 +2170,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
               return coords;
             }
           }
-          
+
           // Try word-by-word matching
           const placeWords = placeName.split(/[\s\-,&]+/).filter((w: string) => w.length > 2);
           for (const word of placeWords) {
@@ -2464,13 +2197,13 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
     // Determine transit color from step
     const getTransitColor = (step: any): string => {
       const routeInfo = (step.route_info || step.description || '').toLowerCase();
-      
+
       for (const [key, color] of Object.entries(transitColors)) {
         if (routeInfo.includes(key)) {
           return color;
         }
       }
-      
+
       return '#3b82f6'; // Default blue for unknown transit
     };
 
@@ -2490,7 +2223,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         const mode = step.transport_mode || 'walking';
         const routeInfo = step.route_info || step.description || '';
         const color = mode === 'walking' ? '#10b981' : getTransitColor(step);
-        
+
         pendingTransit = { color, mode, routeInfo };
         console.log('[Itinerary] Transit step:', mode, routeInfo, '-> color:', color);
         return;
@@ -2505,16 +2238,16 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         let rating = 0;
         let address = '';
         let categories = '';
-        
+
         const stepDesc = (step.description || '').toLowerCase();
         if (itineraryRouteData.originalItems) {
           const matchingItem = itineraryRouteData.originalItems.find((item: any) => {
             const itemName = (item.name || '').toLowerCase();
-            return stepDesc.includes(itemName) || itemName.split(' ').some((w: string) => 
+            return stepDesc.includes(itemName) || itemName.split(' ').some((w: string) =>
               w.length > 3 && stepDesc.includes(w)
             );
           });
-          
+
           if (matchingItem) {
             photoName = matchingItem.photo_name || matchingItem.photoName || '';
             rating = matchingItem.rating || 0;
@@ -2546,7 +2279,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         if (lastLocation) {
           const isWalking = pendingTransit?.mode === 'walking' || !pendingTransit;
           const routeColor = pendingTransit?.color || '#10b981';
-          
+
           routeFeatures.push({
             type: 'Feature',
             geometry: {
@@ -2561,7 +2294,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
               boardingTime: ''
             }
           });
-          
+
           console.log('[Itinerary] Route:', isWalking ? 'walking' : pendingTransit?.routeInfo, 'color:', routeColor);
         }
 
@@ -2592,13 +2325,13 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
     // When itinerary is active, hide all other layers to show ONLY the itinerary
     if (hasItinerary) {
       // Hide transit layers
-      ['trails-glow', 'trails-core', 'trails-head', 'stops-glow', 'stops-marker', 
-       'glow-zone', 'trains-core', 'vehicles-glow', 'mbta-subway-3d', 
-       'ferry-body', 'ferry-label'].forEach(layer => {
-        if (mapInstance.getLayer(layer)) {
-          mapInstance.setLayoutProperty(layer, 'visibility', 'none');
-        }
-      });
+      ['trails-glow', 'trails-core', 'trails-head', 'stops-glow', 'stops-marker',
+        'glow-zone', 'trains-core', 'vehicles-glow', 'mbta-subway-3d',
+        'ferry-body', 'ferry-label'].forEach(layer => {
+          if (mapInstance.getLayer(layer)) {
+            mapInstance.setLayoutProperty(layer, 'visibility', 'none');
+          }
+        });
 
       // Hide places/restaurants
       ['places-glow', 'places-marker', 'places-label'].forEach(layer => {
@@ -2622,13 +2355,13 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
       });
 
       // Show itinerary layers
-      ['itinerary-walking-glow', 'itinerary-walking', 'itinerary-transit-glow', 
-       'itinerary-transit', 'itinerary-stops-circle', 'itinerary-stops-icon', 
-       'itinerary-stops-number-bg', 'itinerary-stops-number', 'itinerary-stops-label'].forEach(layer => {
-        if (mapInstance.getLayer(layer)) {
-          mapInstance.setLayoutProperty(layer, 'visibility', 'visible');
-        }
-      });
+      ['itinerary-walking-glow', 'itinerary-walking', 'itinerary-transit-glow',
+        'itinerary-transit', 'itinerary-stops-circle', 'itinerary-stops-icon',
+        'itinerary-stops-number-bg', 'itinerary-stops-number', 'itinerary-stops-label'].forEach(layer => {
+          if (mapInstance.getLayer(layer)) {
+            mapInstance.setLayoutProperty(layer, 'visibility', 'visible');
+          }
+        });
 
       console.log('[Itinerary] All other layers hidden - showing ONLY itinerary');
     }
@@ -2711,6 +2444,109 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
         });
       }
 
+      // ============================================
+      // NYC SUBWAY LAYERS
+      // ============================================
+
+      // 1. Subway Routes (Lines)
+      if (!map.current.getSource('nyc-routes')) {
+        map.current.addSource('nyc-routes', {
+          type: 'geojson',
+          data: nycRoutes as any
+        });
+
+        // Glow effect for tracks
+        map.current.addLayer({
+          id: 'nyc-routes-glow',
+          type: 'line',
+          source: 'nyc-routes',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': ['get', 'color'],
+            'line-width': [
+              'interpolate', ['linear'], ['zoom'],
+              10, 3,
+              15, 8
+            ],
+            'line-opacity': 0.6,
+            'line-blur': 3
+          }
+        });
+
+        // Core track line
+        map.current.addLayer({
+          id: 'nyc-routes-core',
+          type: 'line',
+          source: 'nyc-routes',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': ['get', 'color'],
+            'line-width': [
+              'interpolate', ['linear'], ['zoom'],
+              10, 1,
+              15, 3
+            ],
+            'line-opacity': 1.0
+          }
+        });
+      }
+
+      // 2. Subway Stations
+      if (!map.current.getSource('nyc-stations')) {
+        map.current.addSource('nyc-stations', {
+          type: 'geojson',
+          data: nycStations as any
+        });
+
+        // Station markers (simple circles for now)
+        map.current.addLayer({
+          id: 'nyc-stations-circle',
+          type: 'circle',
+          source: 'nyc-stations',
+          paint: {
+            'circle-radius': [
+              'interpolate', ['linear'], ['zoom'],
+              10, 2,
+              15, 6
+            ],
+            'circle-color': '#ffffff',
+            'circle-stroke-width': 2,
+            'circle-stroke-color': '#000000'
+          }
+        });
+      }
+
+      // Add 3D Building Layer (Standard Mapbox)
+      if (!map.current.getLayer('3d-buildings')) {
+        map.current.addLayer({
+          id: '3d-buildings',
+          source: 'composite',
+          'source-layer': 'building',
+          filter: ['==', 'extrude', 'true'],
+          type: 'fill-extrusion',
+          minzoom: 13,
+          paint: {
+            'fill-extrusion-color': '#242b35',
+            'fill-extrusion-height': [
+              'interpolate', ['linear'], ['zoom'],
+              13, 0,
+              13.05, ['get', 'height']
+            ],
+            'fill-extrusion-base': [
+              'interpolate', ['linear'], ['zoom'],
+              13, 0,
+              13.05, ['get', 'min_height']
+            ],
+            'fill-extrusion-opacity': 0.8
+          }
+        });
+      }
       // Add 3D buildings layer
       if (!map.current.getLayer('buildings-3d')) {
         map.current.addLayer({
@@ -2733,637 +2569,92 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
 
       console.log('[Map] Style changed, 3D buildings re-added');
 
-      // Re-add transit and events sources and layers after style change
-      const redrawTransitAndEvents = async () => {
+      // Re-add transit layers after style change
+      const redrawLayers = async () => {
         if (!map.current) return;
 
         try {
-			// Fetch current data
-			const [stopsData, placesData, eventsData] = await Promise.all([
-				fetchStops(),
-				fetchPlaces(),
-				fetchEvents(),
-			]);
+          // Re-add NYC Subway sources and layers if needed
+          if (!map.current.getSource('nyc-routes')) {
+            map.current.addSource('nyc-routes', {
+              type: 'geojson',
+              data: nycRoutes as any
+            });
+            map.current.addLayer({
+              id: 'nyc-routes-glow',
+              type: 'line',
+              source: 'nyc-routes',
+              layout: { 'line-join': 'round', 'line-cap': 'round' },
+              paint: {
+                'line-color': ['get', 'color'],
+                'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 15, 8],
+                'line-opacity': 0.6,
+                'line-blur': 3
+              }
+            });
+            map.current.addLayer({
+              id: 'nyc-routes-core',
+              type: 'line',
+              source: 'nyc-routes',
+              layout: { 'line-join': 'round', 'line-cap': 'round' },
+              paint: {
+                'line-color': ['get', 'color'],
+                'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1, 15, 3],
+                'line-opacity': 1.0
+              }
+            });
+          }
 
-			// Re-add MBTA tracks source and glow-zone layer
-			if (!map.current.getSource("mbta-tracks")) {
-				map.current.addSource("mbta-tracks", {
-					type: "geojson",
-					data: MBTA_ARC_TRACKS,
-					lineMetrics: true,
-				});
-			}
+          if (!map.current.getSource('nyc-stations')) {
+            map.current.addSource('nyc-stations', {
+              type: 'geojson',
+              data: nycStations as any
+            });
+            map.current.addLayer({
+              id: 'nyc-stations-circle',
+              type: 'circle',
+              source: 'nyc-stations',
+              paint: {
+                'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 2, 15, 6],
+                'circle-color': '#ffffff',
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#000000'
+              }
+            });
+          }
 
-			// Re-add glow-zone layer if it doesn't exist
-			if (!map.current.getLayer("glow-zone")) {
-				map.current.addLayer({
-					id: "glow-zone",
-					type: "line",
-					source: "mbta-tracks",
-					layout: { "line-cap": "round", "line-join": "round" },
-					paint: {
-						"line-color": [
-							"match",
-							["get", "LINE"],
-							"RED",
-							"#da291c",
-							"BLUE",
-							"#003da5",
-							"ORANGE",
-							"#ff7a00",
-							"GREEN",
-							"#00a651",
-							"SILVER",
-							"#7c8ca3",
-							"#cccccc",
-						],
-						"line-width": [
-							"interpolate",
-							["linear"],
-							["zoom"],
-							10,
-							2,
-							14,
-							3,
-							16,
-							5,
-						],
-						"line-blur": 0,
-						"line-opacity": 1.0,
-					},
-				});
-			}
+          // Re-add landmarks source and layers
+          if (!map.current.getSource("landmarks")) {
+            map.current.addSource("landmarks", {
+              type: "geojson",
+              data: { type: "FeatureCollection", features: [] },
+            });
 
-			// Re-add mbta-trails source if needed
-			if (!map.current.getSource("mbta-trails")) {
-				map.current.addSource("mbta-trails", {
-					type: "geojson",
-					data: { type: "FeatureCollection", features: [] },
-				});
-			}
+            const landmarksData = await fetchLandmarks();
+            (map.current.getSource("landmarks") as mapboxgl.GeoJSONSource).setData(landmarksToGeoJSON(landmarksData));
 
-			// Re-add trail layers if they don't exist
-			if (!map.current.getLayer("trails-glow")) {
-				map.current.addLayer({
-					id: "trails-glow",
-					type: "line",
-					source: "mbta-trails",
-					paint: {
-						"line-color": ["get", "glowColor"],
-						"line-width": ["*", ["get", "width"], 3],
-						"line-blur": ["get", "blur"],
-						"line-opacity": ["*", ["get", "intensity"], 0.4],
-					},
-					layout: { "line-cap": "round", "line-join": "round" },
-				});
-			}
+            map.current.addLayer({
+              id: "landmarks-glow",
+              type: "circle",
+              source: "landmarks",
+              paint: {
+                "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 12, 14, 18, 16, 25],
+                "circle-color": "#a855f7",
+                "circle-blur": 0.8,
+                "circle-opacity": 0.7,
+              },
+              minzoom: 10,
+            });
+          }
 
-			if (!map.current.getLayer("trails-core")) {
-				map.current.addLayer({
-					id: "trails-core",
-					type: "line",
-					source: "mbta-trails",
-					paint: {
-						"line-color": ["get", "color"],
-						"line-width": ["get", "width"],
-						"line-blur": 0.5,
-						"line-opacity": ["get", "intensity"],
-					},
-					layout: { "line-cap": "round", "line-join": "round" },
-				});
-			}
-
-			if (!map.current.getLayer("trails-head")) {
-				map.current.addLayer({
-					id: "trails-head",
-					type: "line",
-					source: "mbta-trails",
-					filter: ["==", ["get", "isHead"], true],
-					paint: {
-						"line-color": "#ffffff",
-						"line-width": 4,
-						"line-blur": 0,
-						"line-opacity": 0.95,
-					},
-					layout: { "line-cap": "round", "line-join": "round" },
-				});
-			}
-
-			// Re-add stops source and layers
-			if (!map.current.getSource("mbta-stops")) {
-				map.current.addSource("mbta-stops", {
-					type: "geojson",
-					data: { type: "FeatureCollection", features: [] },
-				});
-			}
-
-			if (map.current.getSource("mbta-stops")) {
-				(
-					map.current.getSource(
-						"mbta-stops",
-					) as mapboxgl.GeoJSONSource
-				).setData(stopsToGeoJSON(stopsData));
-			}
-
-			// Station core marker (MBTA style)
-      if (!map.current.getLayer("stops-marker")) {
-			map.current.addLayer({
-				id: "stops-marker",
-				type: "circle",
-				source: "mbta-stops",
-				paint: {
-					"circle-radius": [
-						"interpolate",
-						["linear"],
-						["zoom"],
-						12,
-						4,
-						16,
-						8,
-					],
-					"circle-color": "#ffffff", // MBTA red
-					"circle-stroke-color": "#000000",
-					"circle-stroke-width": 1.5,
-				},
-				minzoom: 12,
-			});
-    }
-
-			// Station "T" text (MBTA logo)
-      if (!map.current.getLayer("stops-marker-text")) {
-			map.current.addLayer({
-				id: "stops-marker-text",
-				type: "symbol",
-				source: "mbta-stops",
-				layout: {
-					"text-field": "T",
-					"text-font": ["DIN Pro Bold", "Arial Unicode MS Bold"],
-					"text-size": [
-						"interpolate",
-						["linear"],
-						["zoom"],
-						12,
-						6,
-						16,
-						10,
-					],
-					"text-allow-overlap": true,
-				},
-				paint: {
-					"text-color": "#000000",
-				},
-				minzoom: 12,
-			});}
-
-
-			// Re-add trains tracks source and layers
-			if (!map.current.getSource("trains-tracks")) {
-				map.current.addSource("trains-tracks", {
-					type: "geojson",
-					data: TRAINS_ARC_TRACKS,
-					lineMetrics: true,
-				});
-			}
-
-			// Re-add trains core layer
-			if (!map.current.getLayer("trains-core")) {
-				map.current.addLayer({
-					id: "trains-core",
-					type: "line",
-					source: "trains-tracks",
-					layout: { "line-cap": "round", "line-join": "round" },
-					paint: {
-						"line-color": [
-							"case",
-							["==", ["get", "OWNERSHIP"], "AMTRAK"],
-							VASCULAR_COLORS.amtrakColor,
-							VASCULAR_COLORS.commuterRailColor,
-						],
-						"line-width": [
-							"interpolate",
-							["linear"],
-							["zoom"],
-							10,
-							1,
-							14,
-							1.5,
-							16,
-							2.5,
-						],
-						"line-blur": 0.2,
-						"line-opacity": 0.4,
-					},
-				});
-			}
-
-			// Re-add places source and layers - ONLY if places are toggled on
-				if (!map.current.getSource("places")) {
-					map.current.addSource("places", {
-						type: "geojson",
-						data: { type: "FeatureCollection", features: [] },
-					});
-				}
-
-				if (map.current.getSource("places")) {
-					(
-						map.current.getSource(
-							"places",
-						) as mapboxgl.GeoJSONSource
-					).setData(placesToGeoJSON(placesData));
-				}
-
-				// Re-add place layers if they don't exist
-				if (!map.current.getLayer("places-glow")) {
-					map.current.addLayer({
-						id: "places-glow",
-						type: "circle",
-						source: "places",
-						paint: {
-							"circle-radius": [
-								"interpolate",
-								["linear"],
-								["zoom"],
-								10,
-								8,
-								14,
-								14,
-								16,
-								20,
-							],
-							"circle-color": ["get", "markerColor"],
-							"circle-blur": 0.8,
-							"circle-opacity": 0.6,
-						},
-						minzoom: 10,
-					});
-				}
-
-				if (!map.current.getLayer("places-marker")) {
-					map.current.addLayer({
-						id: "places-marker",
-						type: "circle",
-						source: "places",
-						paint: {
-							"circle-radius": [
-								"interpolate",
-								["linear"],
-								["zoom"],
-								10,
-								4,
-								14,
-								6,
-								16,
-								10,
-							],
-							"circle-color": ["get", "markerColor"],
-							"circle-stroke-color": "#ffffff",
-							"circle-stroke-width": 2,
-						},
-						minzoom: 10,
-					});
-				}
-
-				if (!map.current.getLayer("places-label")) {
-					map.current.addLayer({
-						id: "places-label",
-						type: "symbol",
-						source: "places",
-						layout: {
-							"text-field": ["get", "name"],
-							"text-font": [
-								"DIN Pro Medium",
-								"Arial Unicode MS Regular",
-							],
-							"text-size": 11,
-							"text-offset": [0, 1.2],
-							"text-anchor": "top",
-							"text-max-width": 12,
-						},
-						paint: {
-							"text-color": "#ffffff",
-							"text-halo-color": "#000000",
-							"text-halo-width": 1.5,
-						},
-						minzoom: 15,
-					});
-				}
-
-				if (!map.current.getSource("events")) {
-					map.current.addSource("events", {
-						type: "geojson",
-						data: { type: "FeatureCollection", features: [] },
-					});
-				}
-
-				if (map.current.getSource("events")) {
-					(
-						map.current.getSource(
-							"events",
-						) as mapboxgl.GeoJSONSource
-					).setData(eventsToGeoJSON(eventsData));
-				}
-
-				// Re-add event layers if they don't exist
-				if (!map.current.getLayer("events-glow")) {
-					map.current.addLayer({
-						id: "events-glow",
-						type: "circle",
-						source: "events",
-						paint: {
-							"circle-radius": [
-								"interpolate",
-								["linear"],
-								["zoom"],
-								10,
-								12,
-								14,
-								18,
-								16,
-								25,
-							],
-							"circle-color": "#e879f9",
-							"circle-blur": 0.8,
-							"circle-opacity": 0.7,
-						},
-						minzoom: 10,
-					});
-				}
-
-				if (!map.current.getLayer("events-marker")) {
-					map.current.addLayer({
-						id: "events-marker",
-						type: "symbol",
-						source: "events",
-						layout: {
-							"text-field": "E",
-							"text-font": [
-								"DIN Pro Bold",
-								"Arial Unicode MS Bold",
-							],
-							"text-size": [
-								"interpolate",
-								["linear"],
-								["zoom"],
-								10,
-								16,
-								14,
-								24,
-								16,
-								32,
-							],
-							"text-allow-overlap": true,
-						},
-						paint: {
-							"text-color": "#ffffff",
-							"text-halo-color": "#a855f7",
-							"text-halo-width": 3,
-						},
-						minzoom: 10,
-					});
-				}
-
-				if (!map.current.getLayer("events-label")) {
-					map.current.addLayer({
-						id: "events-label",
-						type: "symbol",
-						source: "events",
-						layout: {
-							"text-field": ["get", "title"],
-							"text-font": [
-								"DIN Pro Medium",
-								"Arial Unicode MS Regular",
-							],
-							"text-size": 11,
-							"text-offset": [0, 1.8],
-							"text-anchor": "top",
-							"text-max-width": 12,
-						},
-						paint: {
-							"text-color": "#ffffff",
-							"text-halo-color": "#000000",
-							"text-halo-width": 1.5,
-						},
-						minzoom: 14,
-					});
-				}
-
-      // Re-add landmarks source and layers - ONLY if landmarks are toggled on
-      if (!map.current.getSource("landmarks")) {
-        map.current.addSource("landmarks", {
-          type: "geojson",
-          data: { type: "FeatureCollection", features: [] },
-        });
-      }
-
-      if (map.current.getSource("landmarks")) {
-        const landmarksData = await fetchLandmarks();
-        (
-          map.current.getSource(
-            "landmarks",
-          ) as mapboxgl.GeoJSONSource
-        ).setData(landmarksToGeoJSON(landmarksData));
-      }
-
-      // Re-add landmark layers if they don't exist
-      if (!map.current.getLayer("landmarks-glow")) {
-        map.current.addLayer({
-          id: "landmarks-glow",
-          type: "circle",
-          source: "landmarks",
-          paint: {
-            "circle-radius": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              10,
-              12,
-              14,
-              18,
-              16,
-              25,
-            ],
-            "circle-color": "#a855f7",
-            "circle-blur": 0.8,
-            "circle-opacity": 0.7,
-          },
-          minzoom: 10,
-        });
-      }
-
-      if (!map.current.getLayer("landmarks-marker")) {
-        map.current.addLayer({
-          id: "landmarks-marker",
-          type: "symbol",
-          source: "landmarks",
-          layout: {
-            "text-field": "L",
-            "text-font": [
-              "DIN Pro Bold",
-              "Arial Unicode MS Bold",
-            ],
-            "text-size": [
-              "interpolate",
-              ["linear"],
-              ["zoom"],
-              10,
-              16,
-              14,
-              24,
-              16,
-              32,
-            ],
-            "text-allow-overlap": true,
-          },
-          paint: {
-            "text-color": "#ffffff",
-            "text-halo-color": "#8b5cf6",
-            "text-halo-width": 3,
-          },
-          minzoom: 10,
-        });
-      }
-
-      if (!map.current.getLayer("landmarks-label")) {
-        map.current.addLayer({
-          id: "landmarks-label",
-          type: "symbol",
-          source: "landmarks",
-          layout: {
-            "text-field": ["get", "name"],
-            "text-font": [
-              "DIN Pro Medium",
-              "Arial Unicode MS Regular",
-            ],
-            "text-size": 11,
-            "text-offset": [0, 1.5],
-            "text-anchor": "top",
-            "text-max-width": 12,
-          },
-          paint: {
-            "text-color": "#ffffff",
-            "text-halo-color": "#000000",
-            "text-halo-width": 1.5,
-          },
-          minzoom: 14,
-        });
-      }
-
-      map.current.addSource("mbta-vehicles", {
-			type: "geojson",
-			data: { type: "FeatureCollection", features: [] },
-		});
-
-		// Vehicle glow halo (route color)
-		map.current.addLayer({
-			id: "vehicles-glow",
-			type: "circle",
-			source: "mbta-vehicles",
-			// Show for all (Rail + Bus) to maintain consistency
-			filter: ["!=", ["get", "opacity"], 0],
-			paint: {
-				"circle-radius": [
-					"interpolate",
-					["linear"],
-					["zoom"],
-					10,
-					15, // Large glow at city scale
-					14,
-					25, // Big halo
-					16,
-					45, // Massive street light effect
-				],
-				"circle-color": ["get", "routeColor"],
-				"circle-blur": 1.0, // Max blur for "Glow" effect
-				"circle-opacity": 0.6, // Visible but not overpowering the model
-				"circle-translate": [0, 0],
-			},
-		});
-
-		// ===========================================
-		// 3D MODEL LAYER - High Fidelity Trains
-		// ===========================================
-		map.current.addLayer({
-			id: "mbta-subway-3d",
-			type: "model",
-			source: "mbta-vehicles",
-			// // Only render 3D model for trains (not buses)
-			// filter: ['all', ['!=', ['get', 'opacity'], 0], ['!=', ['get', 'vehicleType'], 'bus']],
-			layout: {
-				"model-id": "subway-model",
-			},
-			paint: {
-				// DYNAMIC SCALING: "Little Big" Style - ENLARGED
-				"model-scale": [
-					"interpolate",
-					["linear"],
-					["zoom"],
-					10,
-					["literal", [160, 160, 160]], // Icon Mode (City View) - Boosted & Enlarged
-					14,
-					["literal", [50, 50, 50]], // Mid-range - Enlarged
-					16,
-					["literal", [20, 20, 20]], // Approaching street - Enlarged
-					18,
-					[
-						"case",
-						["==", ["get", "vehicleType"], "commuter"],
-						["literal", [7.0, 7.0, 7.0]], // Commuter Rail - Enlarged
-						["==", ["get", "vehicleType"], "lightrail"],
-						["literal", [10.0, 10.0, 10.0]], // Green Line - Enlarged
-						["==", ["get", "vehicleType"], "bus"],
-						["literal", [4.5, 4.5, 4.5]], // Bus - Enlarged
-						["literal", [10.0, 10.0, 10.0]], // Standard Subway - Enlarged
-					],
-				],
-				// REAL RUNNING: Rotate based on API bearing
-				"model-rotation": [0, 0, ["get", "bearing"]],
-
-				// ROUTE COLOR TINT: Apply line color to each subway model
-				// Use routeColor directly - Mapbox should interpret hex colors
-				"model-color": ["get", "routeColor"],
-				// Control the intensity of the color blend (0 = no tint, 1 = full color)
-				"model-color-mix-intensity": 0.8,
-
-				// REALISM RESTORED:
-				// User wants "Real" train color (textures) + Glow.
-				// Glow is handled by the 'vehicles-glow' halo layer behind this model.
-				// Route color tint makes the model match the line color.
-
-				"model-emissive-strength": 0.0, // No emissive glow - rely on halo layer for brightness
-				"model-opacity": ["get", "opacity"],
-			},
-		});
-
-      // Set visibility based on toggle state
-      const placesVis = showPlaces ? 'visible' : 'none';
-      const eventsVis = showEvents ? 'visible' : 'none';
-      const landmarksVis = showLandmarks ? 'visible' : 'none';
-
-      ['places-glow', 'places-marker', 'places-label'].forEach(layer => {
-        if (map.current?.getLayer(layer)) {
-          map.current.setLayoutProperty(layer, 'visibility', placesVis);
-        }
-      });
-
-      ['events-glow', 'events-marker', 'events-label'].forEach(layer => {
-        if (map.current?.getLayer(layer)) {
-          map.current.setLayoutProperty(layer, 'visibility', eventsVis);
-        }
-      });
-
-      ['landmarks-glow', 'landmarks-marker', 'landmarks-label'].forEach(layer => {
-        if (map.current?.getLayer(layer)) {
-          map.current.setLayoutProperty(layer, 'visibility', landmarksVis);
-        }
-      });
-
-			console.log("[Map] Transit and events redrawn after style change");
-		} catch (error) {
-          console.error('[Map] Error redrawing transit and events:', error);
+          console.log('[Map] Layers redrawn after style change');
+        } catch (error) {
+          console.error('[Map] Error redrawing layers:', error);
         }
       };
 
-      redrawTransitAndEvents();
+
+      redrawLayers();
     });
   }, [isDarkMode, isLoaded]);
 
@@ -3534,9 +2825,9 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
             duration: 1200,
           });
         } else {
-          // Return to Boston downtown view
+          // Return to NYC downtown view
           map.current.easeTo({
-            center: BOSTON_CENTER,
+            center: NYC_CENTER,
             pitch: 60,
             zoom: 14,
             bearing: -17,
@@ -3667,7 +2958,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
               ))}
             </div>
           )}
-          
+
           {/* Legend */}
           <div style={{
             display: 'flex',
@@ -3689,7 +2980,7 @@ export default function Map3D({ settings, selectedLocation, isDarkMode, setIsDar
               <span style={{ fontSize: '14px' }}>📍</span>
               <span style={{ color: '#8b5cf6', fontSize: '11px', fontWeight: '500' }}>Visit</span>
             </div>
-            
+
             {/* Routes legend */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{ width: '20px', height: '4px', background: '#10b981', borderRadius: '2px' }}></div>

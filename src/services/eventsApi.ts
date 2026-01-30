@@ -1,7 +1,7 @@
 // Events API Service - MongoDB Integration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
-export interface BostonEvent {
+export interface CityEvent {
   _id: string;
   id: string;
   title: string;
@@ -19,10 +19,14 @@ export interface BostonEvent {
   source?: string;
   source_url?: string;
   photo_name?: string;
+  image_url?: string;
 }
 
+// Backward compatibility alias
+export type BostonEvent = CityEvent;
+
 // Fetch all events from MongoDB
-export async function fetchEvents(): Promise<BostonEvent[]> {
+export async function fetchEvents(): Promise<CityEvent[]> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/events`);
     if (!response.ok) throw new Error(`API error: ${response.status}`);
@@ -36,7 +40,7 @@ export async function fetchEvents(): Promise<BostonEvent[]> {
 }
 
 // Convert events to GeoJSON for Mapbox
-export function eventsToGeoJSON(events: BostonEvent[]): GeoJSON.FeatureCollection {
+export function eventsToGeoJSON(events: CityEvent[]): GeoJSON.FeatureCollection {
   const features: GeoJSON.Feature[] = events
     .filter(e => e.venue?.lat && e.venue?.lng)
     .map(event => {

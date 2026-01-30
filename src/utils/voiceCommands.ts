@@ -20,7 +20,7 @@ export function parseVoiceCommand(input: string): VoiceCommand {
     console.log('[VoiceCommand] Parsing:', input);
 
     // Exit/Close commands
-    if (lower.includes('exit') || lower.includes('close') || lower.includes('stop listening') || 
+    if (lower.includes('exit') || lower.includes('close') || lower.includes('stop listening') ||
         lower.includes('goodbye') || lower.includes('bye') || lower === 'stop' || lower === 'stop stop') {
         return { type: 'exit' };
     }
@@ -64,8 +64,8 @@ export function parseVoiceCommand(input: string): VoiceCommand {
     }
 
     // Navigation commands - "go to map" (but not if it has a location)
-    if ((lower === 'go to map' || lower === 'show map' || lower === 'view map' || lower === 'open map') && 
-        !lower.includes('chinatown') && !lower.includes('back bay') && !lower.includes('fenway')) {
+    if ((lower === 'go to map' || lower === 'show map' || lower === 'view map' || lower === 'open map') &&
+        !lower.includes('manhattan') && !lower.includes('brooklyn') && !lower.includes('queens')) {
         return { type: 'navigate', action: 'map' };
     }
     if (lower.includes('go to itinerary') || lower.includes('show itinerary') || lower.includes('my plan') || lower.includes('my trip')) {
@@ -78,7 +78,7 @@ export function parseVoiceCommand(input: string): VoiceCommand {
     // "Add X to itinerary" commands - extract the place name
     // Patterns: "add the Pine Bar", "add Pine Bar to my itinerary", "can you add Pine Bar"
     // Also: "select Pine Bar and add it" - extract "Pine Bar"
-    
+
     // Pattern: "add/select X and add it" or "add X to itinerary"
     const selectAndAddMatch = lower.match(/(?:select|add)\s+(?:the\s+)?([A-Za-z\s']+?)(?:\s+and\s+add|\s+to\s+(?:my\s+)?(?:itinerary|trip|plan))/i);
     if (selectAndAddMatch && selectAndAddMatch[1]) {
@@ -88,7 +88,7 @@ export function parseVoiceCommand(input: string): VoiceCommand {
             return { type: 'add_to_itinerary', placeName, query: placeName };
         }
     }
-    
+
     // Simple add pattern: "add Pine Bar", "add the Tip Tap Room"
     const simpleAddMatch = lower.match(/^(?:can you )?add\s+(?:the\s+)?([A-Za-z\s']+?)$/i);
     if (simpleAddMatch && simpleAddMatch[1]) {
@@ -104,12 +104,12 @@ export function parseVoiceCommand(input: string): VoiceCommand {
     const specificSearchPatterns = [
         /(?:find me|show me|search for|looking for|i want|get me) (?:the )?(?:best |good |great |top |some )?(.+)/i,
     ];
-    
+
     for (const pattern of specificSearchPatterns) {
         const match = lower.match(pattern);
         if (match && match[1]) {
             const query = match[1].trim()
-                .replace(/\s*in boston\s*/gi, '')
+                .replace(/\s*in (?:boston|nyc|new york)\s*/gi, '')
                 .replace(/\s*please\s*/gi, '')
                 .replace(/\s*nearby\s*/gi, '')
                 .trim();
@@ -163,24 +163,24 @@ export function parseVoiceCommand(input: string): VoiceCommand {
     }
 
     // Layer toggle commands - activities/events
-    if (lower.includes('activities') || lower.includes('activity') || lower.includes('show events') || 
+    if (lower.includes('activities') || lower.includes('activity') || lower.includes('show events') ||
         lower.includes('events') || lower.includes('concerts') || lower.includes('shows') || lower.includes('what\'s happening')) {
         return { type: 'toggle_layer', layer: 'events' };
     }
-    
+
     // Places/restaurants (only if no cuisine keyword matched above)
     if (lower.includes('show places') || lower.includes('show restaurants') || lower === 'restaurants') {
         return { type: 'toggle_layer', layer: 'places' };
     }
-    
+
     // Landmarks
-    if (lower.includes('show landmarks') || lower.includes('landmarks') || lower.includes('show tourist') || 
+    if (lower.includes('show landmarks') || lower.includes('landmarks') || lower.includes('show tourist') ||
         lower.includes('sightseeing') || lower.includes('attractions') || lower.includes('monuments')) {
         return { type: 'toggle_layer', layer: 'landmarks' };
     }
-    
+
     // Hidden gems
-    if (lower.includes('hidden spot') || lower.includes('hidden gem') || lower.includes('hidden') || 
+    if (lower.includes('hidden spot') || lower.includes('hidden gem') || lower.includes('hidden') ||
         lower.includes('secret') || lower.includes('local favorite') || lower.includes('off the beaten')) {
         return { type: 'toggle_layer', layer: 'hidden' };
     }
@@ -189,7 +189,7 @@ export function parseVoiceCommand(input: string): VoiceCommand {
     if (lower.includes(' and ')) {
         const parts = lower.split(' and ');
         const subCommands: VoiceCommand[] = [];
-        
+
         for (const part of parts) {
             const trimmed = part.trim();
             if (trimmed.length > 2) {
@@ -200,7 +200,7 @@ export function parseVoiceCommand(input: string): VoiceCommand {
                 }
             }
         }
-        
+
         if (subCommands.length > 1) {
             console.log('[VoiceCommand] Compound command with', subCommands.length, 'parts');
             return { type: 'compound', subCommands };
@@ -213,7 +213,7 @@ export function parseVoiceCommand(input: string): VoiceCommand {
     const searchPatterns = [
         /(?:where can i (?:get|find)|show me|find|looking for|i want|i need|get me) (.+)/i,
         /(?:best|good|great|top) (.+)/i,
-        /(.+) (?:near|in|around) (?:here|me|boston)/i,
+        /(.+) (?:near|in|around) (?:here|me|boston|nyc|new york)/i,
         /(?:search for|search) (.+)/i
     ];
 
@@ -221,7 +221,7 @@ export function parseVoiceCommand(input: string): VoiceCommand {
         const match = lower.match(pattern);
         if (match && match[1]) {
             const query = match[1].trim()
-                .replace(/\s*in boston\s*/gi, '')
+                .replace(/\s*in (?:boston|nyc|new york)\s*/gi, '')
                 .replace(/\s*please\s*/gi, '')
                 .replace(/\s*nearby\s*/gi, '')
                 .trim();

@@ -149,7 +149,7 @@ export function landmarksToGeoJSON(landmarks: Place[]): GeoJSON.FeatureCollectio
           id: place._id,
           name: displayName,
           address: place.address,
-          city: place.city || 'Boston',
+          city: place.city || 'New York City',
           rating: place.rating || 0,
           ratingCount: place.user_rating_count || 0,
           categories: place.categories?.join(', ') || '',
